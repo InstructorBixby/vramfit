@@ -12,7 +12,6 @@ import struct
 
 MAGIC = b"GGUF"
 
-# metadata value types
 (U8, I8, U16, I16, U32, I32, F32, BOOL, STRING, ARRAY, U64, I64,
  F64) = range(13)
 
@@ -22,9 +21,29 @@ FIXED = {
     U64: ("<Q", 8), I64: ("<q", 8), F64: ("<d", 8),
 }
 
+# Reading these materialises a list of ~128k Python strings for one
+# vocab size integer that is in the metadata anyway. Record the length
+# and seek past the payload.
+SKIP_ARRAYS = ("tokenizer.ggml.tokens", "tokenizer.ggml.scores",
+               "tokenizer.ggml.token_type", "tokenizer.ggml.merges")
+
 
 class GGUFError(Exception):
     pass
+
+
+class Skipped:
+    """Placeholder for an array that was counted and not read."""
+
+    def __init__(self, etype, count):
+        self.etype = etype
+        self.count = count
+
+    def __len__(self):
+        return self.count
+
+    def __repr__(self):
+        return f"Skipped({self.count} items, type {self.etype})"
 
 
 class Reader:
@@ -42,10 +61,25 @@ class Reader:
         return struct.unpack(fmt, self.raw(size))[0]
 
     def string(self):
-        n = self.fixed(U64)
-        return self.raw(n).decode("utf-8", "replace")
+        return self.raw(self.fixed(U64)).decode("utf-8", "replace")
 
-    def value(self, vtype):
+    def skip_value(self, vtype):
+        if vtype in FIXED:
+            self.fh.seek(FIXED[vtype][1], 1)
+        elif vtype == STRING:
+            self.fh.seek(self.fixed(U64), 1)
+        elif vtype == ARRAY:
+            etype = self.fixed(U32)
+            count = self.fixed(U64)
+            if etype in FIXED:
+                self.fh.seek(FIXED[etype][1] * count, 1)
+            else:
+                for _ in range(count):
+                    self.skip_value(etype)
+        else:
+            raise GGUFError(f"unknown value type {vtype}")
+
+    def value(self, vtype, key=""):
         if vtype in FIXED:
             return self.fixed(vtype)
         if vtype == STRING:
@@ -53,6 +87,13 @@ class Reader:
         if vtype == ARRAY:
             etype = self.fixed(U32)
             count = self.fixed(U64)
+            if key in SKIP_ARRAYS:
+                if etype in FIXED:
+                    self.fh.seek(FIXED[etype][1] * count, 1)
+                else:
+                    for _ in range(count):
+                        self.skip_value(etype)
+                return Skipped(etype, count)
             return [self.value(etype) for _ in range(count)]
         raise GGUFError(f"unknown value type {vtype}")
 
@@ -72,7 +113,7 @@ def read_header(path):
         meta = {}
         for _ in range(n_kv):
             key = r.string()
-            meta[key] = r.value(r.fixed(U32))
+            meta[key] = r.value(r.fixed(U32), key)
 
         tensors = []
         for _ in range(n_tensors):
