@@ -13,22 +13,14 @@ bumps a few to something larger -- the output tensor, and `attn_v` /
 `ffn_down` in the outer layers. So the effective bits per weight for a
 file depends on the architecture it was applied to.
 
-Block sizes, which *are* exact, from the ggml type definitions:
+Fix: do not have a bpw table at all. Walk the tensor-info records,
+multiply each tensor's element count by its own type's block ratio, add
+up. Block geometry is exact, it is in the ggml type definitions, and it
+does not depend on the file. `ggml_types.BLOCK` is that table.
 
-| type | weights per block | bytes per block | bpw |
-|---|---|---|---|
-| q4_0 | 32 | 18 | 4.5 |
-| q5_0 | 32 | 22 | 5.5 |
-| q8_0 | 32 | 34 | 8.5 |
-| q2_K | 256 | 84 | 2.625 |
-| q3_K | 256 | 110 | 3.4375 |
-| q4_K | 256 | 144 | 4.5 |
-| q5_K | 256 | 176 | 5.5 |
-| q6_K | 256 | 210 | 6.5625 |
-
-So: take the per-tensor types out of the GGUF tensor table, multiply
-element counts by the block ratio, and the number comes out exact. No
-table of guesses. That is the next thing to build.
+On the 8B above this gives 4.83 bpw and 4.52 GiB of weights, against
+4.58 GiB of file -- the remainder is the header and the alignment
+padding, which is the right size for being ignored.
 
 ## where the KV cache number comes from
 
