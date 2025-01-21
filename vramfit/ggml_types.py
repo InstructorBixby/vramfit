@@ -4,8 +4,8 @@ The ids are the on-disk enum values. The geometry is the struct
 definition for each block type, which is where the real bits-per-weight
 comes from -- there is nothing to estimate.
 """
+from __future__ import annotations
 
-# id -> name
 TYPES = {
     0: "f32", 1: "f16", 2: "q4_0", 3: "q4_1", 6: "q5_0", 7: "q5_1",
     8: "q8_0", 9: "q8_1", 10: "q2_k", 11: "q3_k", 12: "q4_k",
@@ -15,7 +15,6 @@ TYPES = {
     27: "i64", 28: "f64", 29: "iq1_m", 30: "bf16",
 }
 
-# name -> (weights per block, bytes per block)
 BLOCK = {
     "f32": (1, 4),
     "f16": (1, 2),
@@ -49,21 +48,18 @@ BLOCK = {
 }
 
 
-def name(type_id):
+def name(type_id: int) -> str:
     try:
         return TYPES[type_id]
     except KeyError:
         raise KeyError(f"unknown ggml type id {type_id}") from None
 
 
-def bpw(type_name):
+def bpw(type_name: str) -> float:
     n, nbytes = BLOCK[type_name]
     return nbytes * 8 / n
 
 
-def tensor_bytes(elements, type_name):
+def tensor_bytes(elements: int, type_name: str) -> int:
     n, nbytes = BLOCK[type_name]
-    if elements % n:
-        # ggml pads the last block. Round up rather than lie low.
-        return ((elements + n - 1) // n) * nbytes
-    return elements // n * nbytes
+    return ((elements + n - 1) // n) * nbytes
