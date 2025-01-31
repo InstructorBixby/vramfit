@@ -1,0 +1,14 @@
+# The docker runner on hv1. Nothing in here needs a GPU, which is
+# most of the reason the tests are arithmetic over committed header
+# fixtures rather than against a card.
+stages:
+  - test
+
+test:
+  stage: test
+  image: python:3.11-slim
+  before_script:
+    - pip install -e ".[dev]"
+  script:
+    - ruff check .
+    - pytest -q
