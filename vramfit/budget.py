@@ -47,12 +47,25 @@ class Budget:
 
 
 def kv_bytes(shape, context: int, dtype_bytes: int = 2) -> int:
-    """K and V, per layer, for `context` positions.
+    """K and V for `context` positions, across every layer.
 
-    n_head_kv, not n_head. See NOTES.md.
+    The head count here is `n_head_kv` and not `n_head`. Under GQA the
+    K and V projections are shared across a group of query heads, so the
+    cache holds `n_head_kv x head_dim` per position per tensor, not
+    `n_head x head_dim`. Under MQA `n_head_kv` is 1.
+
+    Getting this wrong over-predicts the cache by the GQA ratio, which
+    is 4x on an 8B of this family and 32x on a multi-query model. It is
+    the single easiest way to produce a confidently wrong answer here,
+    and it is what the first version of this function did.
     """
     return (2 * shape.n_layers * shape.n_head_kv * shape.head_dim
             * context * dtype_bytes)
+
+
+def kv_bytes_per_token(shape, dtype_bytes: int = 2) -> int:
+    """Useful on its own: the slope of the cache against context."""
+    return 2 * shape.n_layers * shape.n_head_kv * shape.head_dim * dtype_bytes
 
 
 def compute_bytes(shape, context: int, batch: int = 512) -> int:
