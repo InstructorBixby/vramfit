@@ -1,0 +1,22 @@
+# Vendor specifications, used only as denominators. Columns:
+#   key                 output of devices.normalise()
+#   vram_mib            advertised, not what the driver reports
+#   bandwidth_gbs       peak theoretical memory bandwidth, GB/s
+#   fp16_tflops         dense tensor-core FP16, no sparsity
+#   source              where the row came from
+key,vram_mib,bandwidth_gbs,fp16_tflops,source
+rtx 3060,12288,360.0,25.6,vendor-spec
+rtx 3080,10240,760.3,59.5,vendor-spec
+rtx 3090,24576,936.2,71.0,vendor-spec
+rtx 3090 ti,24576,1008.0,80.0,vendor-spec
+rtx 4060 ti,16384,288.0,44.0,vendor-spec
+rtx 4070,12288,504.2,58.1,vendor-spec
+rtx 4070 ti super,16384,672.3,80.1,vendor-spec
+rtx 4080,16384,716.8,97.5,vendor-spec
+rtx 4090,24576,1008.0,165.2,vendor-spec
+rtx a4000,16384,448.0,76.7,vendor-spec
+rtx a6000,49152,768.0,155.0,vendor-spec
+a100 pcie 40gb,40960,1555.0,312.0,vendor-spec
+a100 sxm4 80gb,81920,2039.0,312.0,vendor-spec
+l4,24576,300.0,121.0,vendor-spec
+tesla t4,16384,320.0,65.1,vendor-spec
