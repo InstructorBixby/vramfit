@@ -24,12 +24,29 @@ class Spec:
 
     @property
     def bandwidth_bps(self) -> float:
-        """GB/s as advertised is 10^9 bytes, not GiB."""
+        """GB/s as advertised means 10^9 bytes, not GiB."""
         return self.bandwidth_gbs * 1e9
 
 
 def load(path=TABLE) -> dict:
     out = {}
-    with open(path, newline="", encoding="utf-8") as fh
-        pass
+    with open(path, newline="", encoding="utf-8") as fh:
+        rows = csv.DictReader(
+            (ln for ln in fh if not ln.startswith("#")))
+        for row in rows:
+            out[row["key"]] = Spec(
+                key=row["key"],
+                vram_mib=int(row["vram_mib"]),
+                bandwidth_gbs=float(row["bandwidth_gbs"]),
+                fp16_tflops=float(row["fp16_tflops"]),
+                source=row["source"],
+            )
     return out
+
+
+def lookup(device_name: str, table=None):
+    """Spec for a device, or None. None is a supported answer."""
+    from vramfit import devices
+
+    table = load() if table is None else table
+    return table.get(devices.normalise(device_name))
