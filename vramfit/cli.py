@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 
-from vramfit import budget, gguf
+from vramfit import budget, devices, gguf, specs
 from vramfit import shape as shape_mod
 
 GIB = 1024 ** 3
@@ -36,6 +36,9 @@ def cmd_shape(args) -> int:
     print(f"head_dim      {sh.head_dim}")
     print(f"vocab         {sh.vocab}")
     print(f"train context {sh.train_context}")
+    print()
+    for name, nbytes in sh.quant_mix().items():
+        print(f"  {name:8} {nbytes / GIB:7.3f} GiB")
     return 0
 
 
@@ -46,13 +49,39 @@ def cmd_fit(args) -> int:
           f"ctx {args.context}")
     print()
     print(b.table())
-    if args.vram:
-        vram = parse_size(args.vram)
-        slack = vram - b.total
-        print()
-        print(f"{'fits' if slack >= 0 else 'does not fit'}: "
-              f"{slack / GIB:+.2f} GiB against {vram / GIB:.1f} GiB")
-        return 0 if slack >= 0 else 1
+
+    vram = parse_size(args.vram) if args.vram else None
+    if vram is None:
+        found = devices.discover()
+        if found:
+            vram = found[0].total
+            print(f"\nagainst {found[0].name}")
+    if vram is None:
+        return 0
+    slack = vram - b.total
+    print()
+    print(f"{'fits' if slack >= 0 else 'does not fit'}: "
+          f"{slack / GIB:+.2f} GiB against {vram / GIB:.1f} GiB")
+    return 0 if slack >= 0 else 1
+
+
+def cmd_devices(args) -> int:
+    found = devices.discover()
+    if not found:
+        print("no CUDA devices visible")
+        return 1
+    table = specs.load()
+    for d in found:
+        print(d)
+        spec = table.get(devices.normalise(d.name))
+        if spec is None:
+            print("    no spec row: bandwidth ratios unavailable")
+        else:
+            print(f"    peak {spec.bandwidth_gbs:.1f} GB/s, "
+                  f"{spec.fp16_tflops:.1f} TFLOP/s fp16 "
+                  f"({spec.source})")
+        if d.driver:
+            print(f"    driver {d.driver}")
     return 0
 
 
@@ -67,8 +96,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("fit", help="will it fit")
     p.add_argument("model")
     p.add_argument("--context", type=int, default=4096)
-    p.add_argument("--vram")
+    p.add_argument("--vram", help="e.g. 16GiB; default is device 0")
     p.set_defaults(fn=cmd_fit)
+
+    p = sub.add_parser("devices", help="what is in the box")
+    p.set_defaults(fn=cmd_devices)
     return ap
 
 

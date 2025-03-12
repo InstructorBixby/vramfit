@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vramfit"
-version = "0.0.1"
+version = "0.0.2"
 description = "Predict whether a model fits in your VRAM, then measure what it does"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,6 +14,8 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "ruff>=0.1"]
+nvml = ["nvidia-ml-py>=12"]
+
 [project.scripts]
 vramfit = "vramfit.cli:main"
 
