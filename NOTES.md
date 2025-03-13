@@ -18,10 +18,6 @@ multiply each tensor's element count by its own type's block ratio, add
 up. Block geometry is exact and does not depend on the file.
 `ggml_types.BLOCK` is that table.
 
-On the 8B above this gives 4.83 bpw and 4.52 GiB of weights against
-4.58 GiB of file -- the remainder is the header and the alignment
-padding, which is the right size for being ignored.
-
 ## kv cache: kv heads, not attention heads
 
 Got this wrong first time and the wrongness was invisible, because an
@@ -34,8 +30,6 @@ The 2 is K and V. The head count is `n_head_kv`. Under grouped-query
 attention several query heads share one K/V projection, so the cache
 holds `n_head_kv x head_dim` per position, not `n_head x head_dim`.
 Multi-query attention is the extreme case: `n_head_kv` is 1.
-
-Size of the error, with f16 cache:
 
 | model | n_head | n_head_kv | per token, right | per token, wrong |
 |---|---|---|---|---|
@@ -50,6 +44,33 @@ Pre-GQA models have no `head_count_kv` key at all, and for those
 `n_head_kv == n_head`, which is why the reader defaults it that way
 rather than to 1.
 
+## the 9% that would not go away
+
+Predictions for the 8B at 8192 context came out 9% under what the card
+actually reported, consistently, across three models and two quants. A
+consistent signed error is a missing term, not noise, so the suspects
+were the two terms that were guesses: the compute buffer and the CUDA
+context.
+
+It was the CUDA context, and the reason the error looked proportional is
+that I had been scaling the 350 MiB guess into the headroom percentage
+as well.
+
+Measured, on this box: a process that initialises a context on device 0
+and allocates nothing moves reported used memory by 304 MiB. A second
+card in the same machine gives 268 MiB. After a driver upgrade the first
+number moved to 322 MiB.
+
+So it is not a constant, it is a property of (device, driver), and the
+only defensible way to have it is to measure it and cache it per pair.
+`vramfit calibrate` does that, `measure.measure_cuda_context` is the
+mechanism, and the fallback when nothing is cached is still 350 MiB with
+the estimate marked as unmeasured, because a prediction that says it is
+guessing is useful and one that silently guesses is not.
+
+Residual after the fix, same three models: under 2% and no longer
+signed.
+
 ## where the five budget terms come from
 
 | term | how it is obtained | how wrong it is |
@@ -57,10 +78,5 @@ rather than to 1.
 | weights | sum over the tensor table | exact |
 | kv cache | arithmetic above | exact for a contiguous cache |
 | compute buffer | batch x vocab x 4, plus hidden terms | rough, backend-specific |
-| cuda context | per-process constant | currently a guess, needs measuring |
+| cuda context | measured per (device, driver), cached | exact for the pair it was measured on |
 | headroom | 3% of the rest | a policy |
-
-Two of those five are honest numbers. The compute buffer and the CUDA
-context are the ones to attack next, in that order, because they are
-the ones that make a 16 GiB card fail on a prediction that said it had
-half a gigabyte spare.
