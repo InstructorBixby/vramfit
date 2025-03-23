@@ -7,23 +7,17 @@ GIB = 1024 ** 3
 def test_kv_uses_kv_heads_not_attention_heads(llama8b):
     # 32 layers, 8 kv heads, head_dim 128, f16 -> 128 KiB per token.
     assert budget.kv_bytes_per_token(llama8b) == 2 * 32 * 8 * 128 * 2
-    # The wrong version, with n_head, would be 4x this.
     wrong = 2 * 32 * llama8b.n_head * 128 * 2
     assert budget.kv_bytes_per_token(llama8b) * 4 == wrong
 
 
 def test_mqa_cache_is_tiny(mqa):
-    # head_count_kv of 1. Using n_head here is a 32x over-estimate,
-    # which is the difference between "needs a second card" and "fits
-    # four times over".
-    per_token = budget.kv_bytes_per_token(mqa)
-    assert per_token == 2 * 24 * 1 * 64 * 2
+    assert budget.kv_bytes_per_token(mqa) == 2 * 24 * 1 * 64 * 2
 
 
 def test_kv_is_linear_in_context(llama8b):
     a = budget.kv_bytes(llama8b, 4096)
-    b = budget.kv_bytes(llama8b, 8192)
-    assert b == 2 * a
+    assert budget.kv_bytes(llama8b, 8192) == 2 * a
 
 
 def test_q8_cache_halves_it(llama8b):
@@ -34,3 +28,14 @@ def test_q8_cache_halves_it(llama8b):
 def test_total_is_the_sum_of_the_terms(llama8b):
     b = budget.build(llama8b, 8192)
     assert b.total == sum(n for _, n in b.rows())
+
+
+def test_unmeasured_context_is_flagged(llama8b):
+    b = budget.build(llama8b, 8192)
+    assert any("assumed" in note for note in b.assumptions)
+
+
+def test_measured_context_is_not_flagged(llama8b):
+    b = budget.build(llama8b, 8192, cuda_context=304 * MIB)
+    assert b.assumptions == []
+    assert b.cuda_context == 304 * MIB
