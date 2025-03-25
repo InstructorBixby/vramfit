@@ -3,17 +3,18 @@ from __future__ import annotations
 
 import argparse
 
-from vramfit import budget, devices, gguf, specs
+from vramfit import budget, devices, gguf, measure, specs
 from vramfit import shape as shape_mod
 
 GIB = 1024 ** 3
+MIB = 1024 ** 2
 
 
 def parse_size(text: str) -> int:
     t = text.strip().lower().replace(" ", "")
-    for suffix, mult in (("gib", GIB), ("mib", 1024 ** 2),
+    for suffix, mult in (("gib", GIB), ("mib", MIB),
                          ("gb", 10 ** 9), ("mb", 10 ** 6),
-                         ("g", GIB), ("m", 1024 ** 2)):
+                         ("g", GIB), ("m", MIB)):
         if t.endswith(suffix):
             return int(float(t[:-len(suffix)]) * mult)
     return int(float(t))
@@ -22,6 +23,19 @@ def parse_size(text: str) -> int:
 def load_shape(path: str):
     _, meta, tensors = gguf.read_header(path)
     return shape_mod.from_gguf(meta, tensors, path)
+
+
+def pick_device(index: int = 0):
+    for d in devices.discover():
+        if d.index == index:
+            return d
+    return None
+
+
+def cuda_context_for(dev) -> int | None:
+    if dev is None:
+        return None
+    return measure.cached_cuda_context(dev.index, dev.name, dev.driver)
 
 
 def cmd_shape(args) -> int:
@@ -44,18 +58,18 @@ def cmd_shape(args) -> int:
 
 def cmd_fit(args) -> int:
     sh = load_shape(args.model)
-    b = budget.build(sh, args.context)
+    dev = pick_device(args.device)
+    b = budget.build(sh, args.context,
+                     cuda_context=cuda_context_for(dev))
     print(f"{sh.name}  {sh.params / 1e9:.2f}B  {sh.bpw:.2f} bpw  "
           f"ctx {args.context}")
     print()
     print(b.table())
 
     vram = parse_size(args.vram) if args.vram else None
-    if vram is None:
-        found = devices.discover()
-        if found:
-            vram = found[0].total
-            print(f"\nagainst {found[0].name}")
+    if vram is None and dev is not None:
+        vram = dev.total
+        print(f"\nagainst {dev.name}")
     if vram is None:
         return 0
     slack = vram - b.total
@@ -82,6 +96,22 @@ def cmd_devices(args) -> int:
                   f"({spec.source})")
         if d.driver:
             print(f"    driver {d.driver}")
+        ctx = measure.cached_cuda_context(d.index, d.name, d.driver)
+        if ctx:
+            print(f"    cuda context {ctx / MIB:.0f} MiB (measured)")
+    return 0
+
+
+def cmd_calibrate(args) -> int:
+    dev = pick_device(args.device)
+    if dev is None:
+        print(f"device {args.device} not visible")
+        return 1
+    value = measure.measure_cuda_context(dev.index)
+    measure.record_cuda_context(value, dev.name, dev.driver)
+    print(f"{dev.name} driver {dev.driver}: "
+          f"cuda context {value / MIB:.0f} MiB")
+    print(f"recorded in {measure.cache_path()}")
     return 0
 
 
@@ -96,11 +126,17 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("fit", help="will it fit")
     p.add_argument("model")
     p.add_argument("--context", type=int, default=4096)
-    p.add_argument("--vram", help="e.g. 16GiB; default is device 0")
+    p.add_argument("--vram", help="e.g. 16GiB; default is the device")
+    p.add_argument("--device", type=int, default=0)
     p.set_defaults(fn=cmd_fit)
 
     p = sub.add_parser("devices", help="what is in the box")
     p.set_defaults(fn=cmd_devices)
+
+    p = sub.add_parser("calibrate",
+                       help="measure this machine's cuda context cost")
+    p.add_argument("--device", type=int, default=0)
+    p.set_defaults(fn=cmd_calibrate)
     return ap
 
 
