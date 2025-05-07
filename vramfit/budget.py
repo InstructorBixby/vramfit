@@ -90,13 +90,23 @@ def compute_bytes(shape, context: int, batch: int = 512) -> int:
 
 def build(shape, context: int, *, cache_dtype_bytes: int = 2,
           batch: int = 512, cuda_context: int | None = None,
-          headroom_frac: float = 0.03) -> Budget:
+          headroom_frac: float = 0.03,
+          weights_override: int | None = None) -> Budget:
+    """Build a budget.
+
+    `weights_override` is for asking hypotheticals -- "this model at
+    some other bits per weight" -- without inventing a fake shape. The
+    weight term is the only one that moves with the quant.
+    """
     notes = []
     if cuda_context is None:
         cuda_context = ASSUMED_CUDA_CONTEXT
         notes.append("cuda context is assumed, not measured: run "
                      "`vramfit calibrate`")
-    weights = shape.weight_bytes
+    weights = (shape.weight_bytes if weights_override is None
+               else weights_override)
+    if weights_override is not None:
+        notes.append("weights are a hypothetical, not a file on disk")
     kv = kv_bytes(shape, context, cache_dtype_bytes)
     compute = compute_bytes(shape, context, batch)
     base = weights + kv + compute + cuda_context
