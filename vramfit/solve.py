@@ -14,8 +14,6 @@ Bisecting calls the real function.
 """
 from __future__ import annotations
 
-from dataclasses import replace
-
 from vramfit import budget, quants
 
 # Contexts are reported rounded down to this, because a backend that
@@ -50,40 +48,31 @@ def max_context(shape, vram: int, *, align: int = ALIGN,
     return (lo // align) * align
 
 
-def at_bpw(shape, bpw: float):
-    """The same model with its weights scaled to a different bpw.
-
-    Only the weight term moves: the cache, the buffers and the context
-    do not care how the weights are stored. Returns a shape-alike with
-    `weight_bytes` overridden, which is all the budget reads.
-    """
-    scaled = int(shape.params * bpw / 8)
-
-    class _Scaled:
-        pass
-
-    # Cheaper and clearer than a second dataclass: copy the real shape
-    # and shadow the one derived property the budget uses.
-    out = replace(shape, tensors=[])
-    out.__dict__["_weight_bytes"] = scaled
-    object.__setattr__(out, "tensors", shape.tensors)
-    return out, scaled
-
-
 def quant_for_context(shape, context: int, vram: int, **kw):
     """Heaviest quant on the ladder that fits `context` in `vram`.
 
-    Returns (QuantEstimate, Budget) or (None, None).
+    Returns (QuantEstimate, Budget), or (None, None) when even the
+    bottom rung does not fit.
     """
     for q in sorted(quants.LADDER, key=lambda q: -q.bpw):
-        b = budget.build(shape, context,
-                         weights_override=int(shape.params * q.bpw / 8),
-                         **kw)
+        b = budget.build(
+            shape, context,
+            weights_override=int(shape.params * q.bpw / 8), **kw)
         if b.total <= vram:
             return q, b
     return None, None
 
 
-def max_layers_offloaded(shape, vram: int, context: int, **kw) -> int:
-    """Placeholder: partial offload needs its own budget. See NOTES."""
-    raise NotImplementedError
+def context_ladder(shape, vram: int, **kw) -> list:
+    """(quant, max context) for every rung that fits at all.
+
+    This is the table I actually want when deciding what to download.
+    """
+    out = []
+    for q in sorted(quants.LADDER, key=lambda q: -q.bpw):
+        ctx = max_context(
+            shape, vram,
+            weights_override=int(shape.params * q.bpw / 8), **kw)
+        if ctx:
+            out.append((q, ctx))
+    return out
