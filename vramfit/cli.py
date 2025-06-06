@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import argparse
 
-from vramfit import budget, devices, gguf, measure, solve, specs
-from vramfit import shape as shape_mod
+from vramfit import budget, devices, load, measure, quants, solve, specs
 
 GIB = 1024 ** 3
 MIB = 1024 ** 2
@@ -24,11 +23,6 @@ def human_ctx(n: int) -> str:
     return f"{n // 1024}k" if n >= 1024 and n % 1024 == 0 else str(n)
 
 
-def load_shape(path: str):
-    _, meta, tensors = gguf.read_header(path)
-    return shape_mod.from_gguf(meta, tensors, path)
-
-
 def pick_device(index: int = 0):
     for d in devices.discover():
         if d.index == index:
@@ -37,9 +31,9 @@ def pick_device(index: int = 0):
 
 
 def resolve_vram(args, dev) -> int | None:
-    if args.vram:
+    if getattr(args, "vram", None):
         return parse_size(args.vram)
-    if args.free and dev is not None:
+    if getattr(args, "free", False) and dev is not None:
         return dev.free
     return dev.total if dev is not None else None
 
@@ -50,12 +44,29 @@ def cuda_context_for(dev) -> int | None:
     return measure.cached_cuda_context(dev.index, dev.name, dev.driver)
 
 
+def weights_override(sh, args) -> int | None:
+    """None when the file told us, a number when it could not."""
+    if getattr(args, "quant", None):
+        q = quants.lookup(args.quant)
+        if q is None:
+            raise SystemExit(f"unknown quant {args.quant!r}; see "
+                             f"`vramfit quants`")
+        return int(sh.params * q.bpw / 8)
+    if sh.weight_bytes:
+        return None
+    raise SystemExit(
+        "no weight files behind this metadata, so the weight term is "
+        "unknown: pass --quant to estimate it")
+
+
 def cmd_shape(args) -> int:
-    sh = load_shape(args.model)
+    sh, how = load.load(args.model)
     print(f"name          {sh.name}")
+    print(f"source        {how}")
     print(f"arch          {sh.arch}")
-    print(f"params        {sh.params / 1e9:.3f}B")
-    print(f"bpw           {sh.bpw:.3f}")
+    if sh.params:
+        print(f"params        {sh.params / 1e9:.3f}B")
+        print(f"bpw           {sh.bpw:.3f}")
     print(f"layers        {sh.n_layers}")
     print(f"heads         {sh.n_head} attention / {sh.n_head_kv} kv "
           f"(gqa {sh.gqa_ratio:.0f}x)")
@@ -64,20 +75,24 @@ def cmd_shape(args) -> int:
     print(f"train context {sh.train_context}")
     print(f"kv per token  "
           f"{budget.kv_bytes_per_token(sh) / 1024:.0f} KiB (f16)")
-    print()
-    for name, nbytes in sh.quant_mix().items():
-        print(f"  {name:8} {nbytes / GIB:7.3f} GiB")
+    if sh.params:
+        print()
+        for name, nbytes in sh.quant_mix().items():
+            print(f"  {name:8} {nbytes / GIB:7.3f} GiB")
     return 0
 
 
 def cmd_fit(args) -> int:
-    sh = load_shape(args.model)
+    sh, how = load.load(args.model)
     dev = pick_device(args.device)
     vram = resolve_vram(args, dev)
     kw = {"cuda_context": cuda_context_for(dev),
-          "cache_dtype_bytes": args.cache_bytes}
+          "cache_dtype_bytes": args.cache_bytes,
+          "weights_override": weights_override(sh, args)}
 
-    print(f"{sh.name}  {sh.params / 1e9:.2f}B  {sh.bpw:.2f} bpw")
+    label = f"{sh.name}  {sh.params / 1e9:.2f}B" if sh.params \
+        else f"{sh.name}"
+    print(f"{label}  ({how})")
     if dev is not None and not args.vram:
         print(f"against {dev.name}")
     print()
@@ -91,8 +106,7 @@ def cmd_fit(args) -> int:
             print(f"does not fit at any context in "
                   f"{vram / GIB:.1f} GiB")
             return 1
-        print(f"largest context that fits: {ctx} "
-              f"({human_ctx(ctx)})")
+        print(f"largest context that fits: {ctx} ({human_ctx(ctx)})")
         print()
         print(budget.build(sh, ctx, **kw).table())
         return 0
@@ -101,6 +115,7 @@ def cmd_fit(args) -> int:
         if vram is None:
             print("need --vram or a visible device")
             return 2
+        kw.pop("weights_override")
         q, b = solve.quant_for_context(sh, args.for_context, vram, **kw)
         if q is None:
             print(f"{human_ctx(args.for_context)} does not fit in "
@@ -125,7 +140,7 @@ def cmd_fit(args) -> int:
 
 
 def cmd_ladder(args) -> int:
-    sh = load_shape(args.model)
+    sh, _ = load.load(args.model)
     dev = pick_device(args.device)
     vram = resolve_vram(args, dev)
     if vram is None:
@@ -133,13 +148,20 @@ def cmd_ladder(args) -> int:
         return 2
     kw = {"cuda_context": cuda_context_for(dev),
           "cache_dtype_bytes": args.cache_bytes}
-    print(f"{sh.name}  {sh.params / 1e9:.2f}B  in {vram / GIB:.1f} GiB")
+    print(f"{sh.name}  in {vram / GIB:.1f} GiB")
     print()
     print(f"{'quant':16} {'bpw':>5}  {'weights':>9}  {'max ctx':>9}")
     for q, ctx in solve.context_ladder(sh, vram, **kw):
         w = sh.params * q.bpw / 8
         print(f"{q.name:16} {q.bpw:5.2f}  {w / GIB:7.2f} GiB  "
               f"{human_ctx(ctx):>9}")
+    return 0
+
+
+def cmd_quants(args) -> int:
+    print(f"{'name':18} {'bpw':>5}  source")
+    for q in sorted(quants.LADDER, key=lambda q: q.bpw):
+        print(f"{q.name:18} {q.bpw:5.2f}  {q.source}")
     return 0
 
 
@@ -186,6 +208,9 @@ def add_target_args(p) -> None:
     p.add_argument("--device", type=int, default=0)
     p.add_argument("--cache-bytes", type=int, default=2,
                    choices=(1, 2), help="kv cache dtype size")
+    p.add_argument("--quant",
+                   help="estimate weights at this scheme instead of "
+                        "reading them")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -210,6 +235,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("model")
     add_target_args(p)
     p.set_defaults(fn=cmd_ladder)
+
+    p = sub.add_parser("quants", help="the bpw ladder")
+    p.set_defaults(fn=cmd_quants)
 
     p = sub.add_parser("devices", help="what is in the box")
     p.set_defaults(fn=cmd_devices)
