@@ -2,6 +2,30 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [0.2.0]
+
+### Added
+- `vramfit fit --max-context`: longest context that fits, by
+  bisecting the real budget rather than inverting it on paper.
+- `vramfit fit --for-context N`: heaviest quant that still fits.
+- `vramfit ladder`: quant against max context, which is the table
+  I actually want before downloading anything.
+- safetensors header reader, sharded-repo aware.
+- Hugging Face `config.json` reader, including rope-scaling, so a
+  model can be sized before any weights are downloaded.
+- One loader entry point: GGUF file, repo directory, safetensors
+  or config.json.
+- `vramfit quants`: the bits-per-weight ladder and where each
+  number came from.
+- `--free` to budget against free memory instead of total, and
+  `--cache-bytes` for a quantised KV cache.
+
+### Changed
+- `budget.build` takes `weights_override` so hypotheticals do not
+  need a fabricated shape.
+- A metadata-only load refuses to guess the weight term and asks
+  for `--quant`.
+
 ## [0.1.0]
 
 ### Added
