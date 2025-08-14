@@ -2,6 +2,25 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [0.3.0]
+
+### Added
+- `vramfit bench`: prompt processing and token generation measured
+  separately, because they are bound by different things.
+- llama.cpp backend, driven through `llama-bench -o json`.
+- Roofline ceilings: FLOP/s for prefill, memory bandwidth for
+  decode, and the achieved fraction of each.
+- Achieved bandwidth in GB/s alongside tok/s. The fraction is the
+  output worth having -- it says whether the next improvement is
+  available at all.
+- `docs/speed.md` on why one tok/s number describes nothing.
+
+### Changed
+- A result carries driver version, backend build and cache dtype,
+  because a number without them cannot be compared later.
+- An unknown GPU produces no ratio and a note saying why, rather
+  than a ratio against an invented peak.
+
 ## [0.2.0]
 
 ### Added
