@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from vramfit import bench, devices, load
+from vramfit.ledger import Ledger
 
 MIB = 1024 ** 2
 
@@ -19,6 +20,9 @@ def add_parser(sub):
     p.add_argument("--batch", type=int, default=512)
     p.add_argument("--reps", type=int, default=3)
     p.add_argument("--device", type=int, default=0)
+    p.add_argument("--record", action="store_true",
+                   help="append the result to the ledger")
+    p.add_argument("--db")
     p.set_defaults(fn=run)
     return p
 
@@ -46,4 +50,9 @@ def run(args) -> int:
     print(res.summary())
     for note in res.notes:
         print(f"  ! {note}")
+
+    if args.record:
+        with Ledger(args.db) as led:
+            led.record(res)
+        print("recorded")
     return 0
