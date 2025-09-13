@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import argparse
 
-from vramfit import (budget, cmd_bench, devices, load, measure, quants,
-                     solve, specs)
+from vramfit import (budget, cmd_bench, cmd_ledger, devices, load,
+                     measure, quants, solve, specs)
 
 GIB = 1024 ** 3
 MIB = 1024 ** 2
@@ -238,6 +238,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_ladder)
 
     cmd_bench.add_parser(sub)
+    cmd_ledger.add_parser(sub)
 
     p = sub.add_parser("quants", help="the bpw ladder")
     p.set_defaults(fn=cmd_quants)
