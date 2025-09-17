@@ -42,7 +42,9 @@ def run(args) -> int:
         print("no CUDA device visible; a measurement needs one")
         return 1
 
-    res = fn(sh, model=args.model, gpu=dev.name, context=args.context,
+    # dev.tag and not dev.name: two identical cards in one box have to
+    # be distinguishable in the ledger.
+    res = fn(sh, model=args.model, gpu=dev.tag, context=args.context,
              quant=args.quant, binary=args.bin,
              cache_type=args.cache_type,
              n_gpu_layers=args.n_gpu_layers, batch=args.batch,
