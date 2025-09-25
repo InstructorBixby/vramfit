@@ -2,6 +2,25 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [0.4.0]
+
+### Added
+- A ledger: every measurement kept in sqlite, keyed by (model,
+  quant, context, backend, gpu), with driver version and backend
+  build as provenance.
+- `vramfit bench --record`.
+- `vramfit ledger list | show | diff`. The diff reports measured
+  changes above 2% and prints the provenance that moved at the
+  same time next to them, because a speed change reported without
+  the driver change beside it invites the wrong conclusion.
+- Markdown and CSV export of the latest measurement per key.
+
+### Fixed
+- A box with two identical cards collided on one ledger key and
+  the diff reported a 30% regression that was the other slot.
+  Device identity now includes the NVML UUID, and `normalise`
+  strips the suffix again so spec lookups still work.
+
 ## [0.3.0]
 
 ### Added
