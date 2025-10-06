@@ -1,4 +1,4 @@
-"""The VRAM budget, as five terms that are each separately wrong.
+"""The VRAM budget, as terms that are each separately wrong.
 
 Keeping them separate is the point: when a prediction misses, the useful
 question is which term missed, and a single number cannot answer it.
@@ -8,6 +8,10 @@ question is which term missed, and a single number cannot answer it.
   compute buffer backend-specific, scales with the batch
   cuda context   measured per (device, driver), cached
   headroom       fragmentation slack, a policy and not a measurement
+
+Partial offload is not a sixth term, it is a scale factor on the first
+two -- and on both of them, which is the part that is easy to get wrong.
+See docs/offload.md.
 """
 from __future__ import annotations
 
@@ -22,6 +26,10 @@ GIB = 1024 ** 3
 # silently is not.
 ASSUMED_CUDA_CONTEXT = 350 * MIB
 
+# Tensors that are not part of a transformer block. Under partial
+# offload these are the ones whose placement is a build detail.
+NON_BLOCK = ("token_embd", "output.weight", "output_norm")
+
 
 @dataclass
 class Budget:
@@ -31,6 +39,7 @@ class Budget:
     cuda_context: int
     headroom: int
     assumptions: list = field(default_factory=list)
+    offloaded_layers: int | None = None
 
     @property
     def total(self) -> int:
@@ -50,23 +59,29 @@ class Budget:
         out = [f"{label:16} {n / GIB:8.3f} GiB"
                for label, n in self.rows()]
         out.append(f"{'total':16} {self.total / GIB:8.3f} GiB")
+        if self.offloaded_layers is not None:
+            out.append(f"{'offloaded':16} "
+                       f"{self.offloaded_layers} layers")
         for note in self.assumptions:
             out.append(f"  ! {note}")
         return "\n".join(out)
 
 
-def kv_bytes(shape, context: int, dtype_bytes: int = 2) -> int:
-    """K and V for `context` positions, across every layer.
+def kv_bytes(shape, context: int, dtype_bytes: int = 2,
+             layers: int | None = None) -> int:
+    """K and V for `context` positions, across `layers` layers.
 
     The head count here is `n_head_kv` and not `n_head`. Under GQA the
     K and V projections are shared across a group of query heads, so the
     cache holds `n_head_kv x head_dim` per position per tensor. Under
     MQA `n_head_kv` is 1.
 
-    Getting this wrong over-predicts the cache by the GQA ratio, which
-    is 4x on an 8B of this family and 32x on a multi-query model.
+    `layers` defaults to all of them. It is a parameter because the
+    cache for a layer lives wherever that layer lives, so a partially
+    offloaded model has a partially offloaded cache.
     """
-    return (2 * shape.n_layers * shape.n_head_kv * shape.head_dim
+    n = shape.n_layers if layers is None else layers
+    return (2 * n * shape.n_head_kv * shape.head_dim
             * context * dtype_bytes)
 
 
@@ -88,29 +103,73 @@ def compute_bytes(shape, context: int, batch: int = 512) -> int:
     return logits + hidden
 
 
+def is_block_tensor(name: str) -> bool:
+    return not any(name.startswith(p) or name == p for p in NON_BLOCK)
+
+
+def block_weight_bytes(shape) -> tuple:
+    """(bytes in transformer blocks, bytes outside them)."""
+    block = sum(t.nbytes for t in shape.tensors
+                if is_block_tensor(t.name))
+    return block, shape.weight_bytes - block
+
+
+def offloaded_weight_bytes(shape, n_gpu_layers: int) -> int:
+    """Weight bytes resident on the card at `-ngl n_gpu_layers`.
+
+    The block tensors scale with the layer count. The embedding and
+    output tensors do not move until everything does, which is an
+    approximation of a build detail -- see docs/offload.md.
+    """
+    if n_gpu_layers >= shape.n_layers:
+        return shape.weight_bytes
+    if n_gpu_layers <= 0:
+        return 0
+    block, _ = block_weight_bytes(shape)
+    return int(block * n_gpu_layers / shape.n_layers)
+
+
 def build(shape, context: int, *, cache_dtype_bytes: int = 2,
           batch: int = 512, cuda_context: int | None = None,
           headroom_frac: float = 0.03,
-          weights_override: int | None = None) -> Budget:
+          weights_override: int | None = None,
+          n_gpu_layers: int | None = None) -> Budget:
     """Build a budget.
 
-    `weights_override` is for asking hypotheticals -- "this model at
-    some other bits per weight" -- without inventing a fake shape. The
-    weight term is the only one that moves with the quant.
+    `weights_override` is for asking hypotheticals -- the same model at
+    some other bits per weight -- without inventing a fake shape.
+    `n_gpu_layers` is `-ngl`: None or >= n_layers means fully resident.
     """
     notes = []
     if cuda_context is None:
         cuda_context = ASSUMED_CUDA_CONTEXT
         notes.append("cuda context is assumed, not measured: run "
                      "`vramfit calibrate`")
-    weights = (shape.weight_bytes if weights_override is None
-               else weights_override)
+
+    full = n_gpu_layers is None or n_gpu_layers >= shape.n_layers
+    resident_layers = shape.n_layers if full else max(0, n_gpu_layers)
+
     if weights_override is not None:
+        weights = weights_override
+        if not full:
+            weights = int(weights_override
+                          * resident_layers / shape.n_layers)
         notes.append("weights are a hypothetical, not a file on disk")
-    kv = kv_bytes(shape, context, cache_dtype_bytes)
+    else:
+        weights = (shape.weight_bytes if full
+                   else offloaded_weight_bytes(shape, resident_layers))
+
+    kv = kv_bytes(shape, context, cache_dtype_bytes, resident_layers)
     compute = compute_bytes(shape, context, batch)
+    if not full:
+        notes.append(
+            f"partial offload: {resident_layers}/{shape.n_layers} "
+            f"layers and the same fraction of the cache are on the "
+            f"card; placement of the embedding and output tensors is a "
+            f"build detail (docs/offload.md)")
     base = weights + kv + compute + cuda_context
     return Budget(weights=weights, kv_cache=kv, compute=compute,
                   cuda_context=cuda_context,
                   headroom=int(base * headroom_frac),
-                  assumptions=notes)
+                  assumptions=notes,
+                  offloaded_layers=None if full else resident_layers)
