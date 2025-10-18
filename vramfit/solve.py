@@ -76,3 +76,27 @@ def context_ladder(shape, vram: int, **kw) -> list:
         if ctx:
             out.append((q, ctx))
     return out
+
+
+def max_gpu_layers(shape, vram: int, context: int, **kw) -> int:
+    """Largest `-ngl` that fits, 0 .. n_layers.
+
+    Monotonic in the layer count, so the same bisection applies. The
+    answer being `n_layers` means the model fits outright and partial
+    offload is not the question.
+    """
+    kw.pop("n_gpu_layers", None)
+    if budget.build(shape, context, n_gpu_layers=shape.n_layers,
+                    **kw).total <= vram:
+        return shape.n_layers
+    lo, hi = 0, shape.n_layers
+    if budget.build(shape, context, n_gpu_layers=0, **kw).total > vram:
+        return 0
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if budget.build(shape, context, n_gpu_layers=mid,
+                        **kw).total <= vram:
+            lo = mid
+        else:
+            hi = mid
+    return lo
