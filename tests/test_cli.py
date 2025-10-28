@@ -1,6 +1,6 @@
 import pytest
 
-from vramfit import cli
+from vramfit import cli, devices
 
 from .conftest import FIXTURES
 
@@ -10,7 +10,7 @@ MODEL = str(FIXTURES / "llama-3.1-8b-instruct-q4_k_m.header.gguf")
 @pytest.fixture(autouse=True)
 def no_gpu(monkeypatch):
     """The CLI must be usable on a machine with no CUDA device."""
-    monkeypatch.setattr(cli.devices, "discover", lambda: [])
+    monkeypatch.setattr(devices, "discover", lambda: [])
 
 
 def test_parse_size_units():
@@ -47,10 +47,29 @@ def test_for_context_names_a_quant(capsys):
     assert "bpw" in capsys.readouterr().out
 
 
+def test_max_layers_on_a_small_card(capsys):
+    assert cli.main(["fit", MODEL, "--max-layers", "--vram",
+                     "4GiB", "--context", "8192"]) == 0
+    out = capsys.readouterr().out
+    assert "largest -ngl that fits" in out
+    assert "partial offload" in out
+
+
+def test_max_layers_on_a_big_card(capsys):
+    assert cli.main(["fit", MODEL, "--max-layers", "--vram",
+                     "24GiB", "--context", "8192"]) == 0
+    assert "fits outright" in capsys.readouterr().out
+
+
+def test_explicit_ngl_is_respected(capsys):
+    assert cli.main(["fit", MODEL, "--n-gpu-layers", "16",
+                     "--vram", "24GiB"]) == 0
+    assert "offloaded" in capsys.readouterr().out
+
+
 def test_ladder_has_more_than_one_row(capsys):
     assert cli.main(["ladder", MODEL, "--vram", "16GiB"]) == 0
-    out = capsys.readouterr().out
-    assert out.count("\n") > 6
+    assert capsys.readouterr().out.count("\n") > 6
 
 
 def test_fit_without_a_device_or_vram_is_not_a_crash(capsys):
