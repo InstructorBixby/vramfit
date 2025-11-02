@@ -21,6 +21,9 @@ from vramfit import roofline, specs
 from vramfit.bench import register
 from vramfit.bench.result import Result
 
+CACHE_BYTES = {"f16": 2, "bf16": 2, "f32": 4, "q8_0": 1, "q8_1": 1,
+               "q5_1": 1, "q5_0": 1, "q4_1": 1, "q4_0": 1, "iq4_nl": 1}
+
 
 class BenchError(Exception):
     pass
@@ -90,8 +93,6 @@ def bench(shape, *, model: str, gpu: str, context: int = 4096,
     prefill, decode = split_rows(rows)
     build = str(rows[0].get("build_commit") or "")
 
-    spec = specs.lookup(gpu)
-    cache_bytes = 1 if cache_type in ("q8_0", "q8_1") else 2
     res = Result(
         model=shape.name or model, quant=quant or f"{shape.bpw:.2f}bpw",
         context=context, backend="llama.cpp", gpu=gpu,
@@ -99,11 +100,25 @@ def bench(shape, *, model: str, gpu: str, context: int = 4096,
         driver=driver, backend_version=build,
         n_gpu_layers=n_gpu_layers, cache_dtype=cache_type, batch=batch)
 
+    partial = n_gpu_layers < shape.n_layers
+    if partial:
+        # Decode with any layer on the host is bound by the host path,
+        # which is an order of magnitude slower per byte. A fraction
+        # against GPU bandwidth would not be inaccurate, it would be
+        # meaningless, so there is no fraction.
+        res.notes.append(
+            f"partial offload ({n_gpu_layers}/{shape.n_layers} "
+            f"layers): no bandwidth fraction, the bound is the host "
+            f"path")
+        return res
+
+    spec = specs.lookup(gpu)
     if spec is None:
         res.notes.append(f"no spec row for {gpu!r}: no peak to compare "
                          f"against, ratios left at zero")
         return res
 
+    cache_bytes = CACHE_BYTES.get(cache_type, 2)
     dec = roofline.decode_ceiling(shape, context, spec.bandwidth_bps,
                                   cache_bytes)
     pre = roofline.prefill_ceiling(shape, spec.fp16_tflops * 1e12)
