@@ -2,6 +2,29 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [0.5.0]
+
+### Added
+- Partial offload. `--n-gpu-layers` to budget a given `-ngl`, and
+  `--max-layers` for the largest one that fits.
+- `docs/offload.md` on what actually lives where.
+
+### Fixed
+- The KV cache under partial offload. The cache for a layer lives
+  wherever the layer lives, so offloading 20 of 32 layers puts
+  62.5% of the cache on the card -- not all of it, and not none.
+  The all-of-it version over-predicted; the none-of-it version
+  produced a confident 'it fits' followed by an OOM.
+- Embedding and output tensors are no longer scaled with the layer
+  count. They do not move until everything does, which is an
+  approximation of a build detail and is marked as one.
+
+### Changed
+- A partial-offload bench reports tok/s and no bandwidth
+  fraction. The bound is the host path, so a fraction against GPU
+  bandwidth would be meaningless rather than merely inaccurate.
+- `fit` moved into `cmd_fit.py`; `cli.py` is wiring now.
+
 ## [0.4.0]
 
 ### Added
