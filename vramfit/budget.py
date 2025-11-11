@@ -67,7 +67,7 @@ class Budget:
         return "\n".join(out)
 
 
-def kv_bytes(shape, context: int, dtype_bytes: int = 2,
+def kv_bytes(shape, context: int, dtype_bytes: float = 2,
              layers: int | None = None) -> int:
     """K and V for `context` positions, across `layers` layers.
 
@@ -76,18 +76,23 @@ def kv_bytes(shape, context: int, dtype_bytes: int = 2,
     cache holds `n_head_kv x head_dim` per position per tensor. Under
     MQA `n_head_kv` is 1.
 
+    `dtype_bytes` is a float because a quantised cache is not a whole
+    number of bytes per element: q8_0 is 34 bytes per 32, which is 8.5
+    bits and not 8.
+
     `layers` defaults to all of them. It is a parameter because the
     cache for a layer lives wherever that layer lives, so a partially
     offloaded model has a partially offloaded cache.
     """
     n = shape.n_layers if layers is None else layers
-    return (2 * n * shape.n_head_kv * shape.head_dim
-            * context * dtype_bytes)
+    return int(2 * n * shape.n_head_kv * shape.head_dim
+               * context * dtype_bytes)
 
 
-def kv_bytes_per_token(shape, dtype_bytes: int = 2) -> int:
+def kv_bytes_per_token(shape, dtype_bytes: float = 2) -> int:
     """The slope of the cache against context."""
-    return 2 * shape.n_layers * shape.n_head_kv * shape.head_dim * dtype_bytes
+    return int(2 * shape.n_layers * shape.n_head_kv * shape.head_dim
+               * dtype_bytes)
 
 
 def compute_bytes(shape, context: int, batch: int = 512) -> int:
@@ -129,22 +134,38 @@ def offloaded_weight_bytes(shape, n_gpu_layers: int) -> int:
     return int(block * n_gpu_layers / shape.n_layers)
 
 
-def build(shape, context: int, *, cache_dtype_bytes: int = 2,
+def build(shape, context: int, *, cache_dtype: str = "f16",
+          cache_dtype_bytes: float | None = None,
           batch: int = 512, cuda_context: int | None = None,
           headroom_frac: float = 0.03,
           weights_override: int | None = None,
-          n_gpu_layers: int | None = None) -> Budget:
+          n_gpu_layers: int | None = None,
+          flash_attn: bool = False) -> Budget:
     """Build a budget.
 
     `weights_override` is for asking hypotheticals -- the same model at
     some other bits per weight -- without inventing a fake shape.
     `n_gpu_layers` is `-ngl`: None or >= n_layers means fully resident.
+    `cache_dtype_bytes` overrides the named type, for callers that have
+    a number rather than a name.
     """
+    from vramfit import cache as cache_mod
+
     notes = []
     if cuda_context is None:
         cuda_context = ASSUMED_CUDA_CONTEXT
         notes.append("cuda context is assumed, not measured: run "
                      "`vramfit calibrate`")
+
+    if cache_dtype_bytes is None:
+        cache_dtype_bytes = cache_mod.element_bytes(cache_dtype)
+        ctype = cache_mod.lookup(cache_dtype)
+        if ctype is not None and ctype.needs_flash_attn \
+                and not flash_attn:
+            notes.append(
+                f"{cache_dtype} cache needs flash attention in "
+                f"llama.cpp; without it V stays f16 and the real cache "
+                f"is larger than this")
 
     full = n_gpu_layers is None or n_gpu_layers >= shape.n_layers
     resident_layers = shape.n_layers if full else max(0, n_gpu_layers)
