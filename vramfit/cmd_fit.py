@@ -5,7 +5,7 @@ dispatch was longer than the work.
 """
 from __future__ import annotations
 
-from vramfit import budget, devices, load, measure, quants, solve
+from vramfit import budget, cache, devices, load, measure, quants, solve
 
 GIB = 1024 ** 3
 MIB = 1024 ** 2
@@ -61,13 +61,23 @@ def weights_override(sh, args) -> int | None:
         "unknown: pass --quant to estimate it")
 
 
+def budget_kwargs(args, dev) -> dict:
+    if cache.lookup(args.cache_type) is None:
+        raise SystemExit(f"unknown cache type {args.cache_type!r}")
+    return {"cuda_context": cuda_context_for(dev),
+            "cache_dtype": args.cache_type,
+            "flash_attn": args.flash_attn}
+
+
 def add_target_args(p) -> None:
     p.add_argument("--vram", help="e.g. 16GiB; default is the device")
     p.add_argument("--free", action="store_true",
                    help="budget against free memory, not total")
     p.add_argument("--device", type=int, default=0)
-    p.add_argument("--cache-bytes", type=int, default=2,
-                   choices=(1, 2), help="kv cache dtype size")
+    p.add_argument("--cache-type", default="f16",
+                   help="kv cache dtype: f16, q8_0, q4_0 ...")
+    p.add_argument("--flash-attn", action="store_true",
+                   help="required for a quantised V cache")
     p.add_argument("--quant",
                    help="estimate weights at this scheme instead of "
                         "reading them")
@@ -94,9 +104,8 @@ def run(args) -> int:
     sh, how = load.load(args.model)
     dev = pick_device(args.device)
     vram = resolve_vram(args, dev)
-    kw = {"cuda_context": cuda_context_for(dev),
-          "cache_dtype_bytes": args.cache_bytes,
-          "weights_override": weights_override(sh, args)}
+    kw = budget_kwargs(args, dev)
+    kw["weights_override"] = weights_override(sh, args)
     if args.n_gpu_layers is not None:
         kw["n_gpu_layers"] = args.n_gpu_layers
 
