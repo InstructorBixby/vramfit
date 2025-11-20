@@ -50,9 +50,9 @@ def cmd_ladder(args) -> int:
     if vram is None:
         print("need --vram or a visible device")
         return 2
-    kw = {"cuda_context": cuda_context_for(dev),
-          "cache_dtype_bytes": args.cache_bytes}
-    print(f"{sh.name}  in {vram / GIB:.1f} GiB")
+    kw = cmd_fit.budget_kwargs(args, dev)
+    print(f"{sh.name}  in {vram / GIB:.1f} GiB  "
+          f"({args.cache_type} cache)")
     print()
     print(f"{'quant':16} {'bpw':>5}  {'weights':>9}  {'max ctx':>9}")
     for q, ctx in solve.context_ladder(sh, vram, **kw):
