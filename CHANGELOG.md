@@ -2,6 +2,20 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [0.5.1]
+
+### Added
+- `--cache-type` by name (f16, q8_0, q4_0 ...) with the real block
+  geometry behind it: a q8_0 cache is 8.5 bits per element, not 8,
+  for the same reason the weights are not 4.
+- `--flash-attn`. A quantised V cache needs it in llama.cpp, and
+  without it the backend keeps V in f16 -- so the prediction and
+  the measurement disagree for a reason unrelated to the
+  arithmetic. Now it says so.
+
+### Changed
+- `--cache-bytes` is gone, replaced by `--cache-type`.
+
 ## [0.5.0]
 
 ### Added
