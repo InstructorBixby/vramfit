@@ -7,9 +7,9 @@ which rules out most of the convenience wrappers and is why the backends
 drive the underlying tools directly.
 
 Nothing in here imports a model library. Each backend shells out to the
-binary or the server it is measuring, because that is the thing whose
-performance is in question -- a Python binding would measure a different
-build with different flags.
+binary, or talks to the server, that it is measuring -- that is the
+thing whose performance is in question, and a Python binding would
+measure a different build with different flags.
 """
 from __future__ import annotations
 
@@ -30,4 +30,4 @@ def available() -> list:
 
 
 def load_builtins() -> None:
-    from vramfit.bench import llamacpp  # noqa: F401
+    from vramfit.bench import llamacpp, vllm  # noqa: F401
