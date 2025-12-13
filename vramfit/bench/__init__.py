@@ -30,4 +30,4 @@ def available() -> list:
 
 
 def load_builtins() -> None:
-    from vramfit.bench import llamacpp, vllm  # noqa: F401
+    from vramfit.bench import exl2, llamacpp, vllm  # noqa: F401
