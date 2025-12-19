@@ -2,6 +2,22 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [0.6.0]
+
+### Added
+- Backend profiles. The five-term budget describes llama.cpp; the
+  others allocate differently enough that applying it unchanged
+  gives a number that looks right and is not. `docs/backends.md`.
+- vLLM: `vramfit plan`, which answers the question vLLM actually
+  raises -- how many concurrent sequences of length N does the
+  block budget hold -- rather than a yes/no it will never give.
+  Paged cache, so sequences round up to a block, per sequence.
+- vLLM bench backend. Prefill comes from time-to-first-token and
+  decode from the inter-token intervals, because a non-streamed
+  response cannot be separated into the two.
+- exllamav2 bench backend, with its own cache-mode byte costs,
+  which are not the ggml block sizes.
+
 ## [0.5.1]
 
 ### Added
