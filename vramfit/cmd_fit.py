@@ -5,7 +5,8 @@ dispatch was longer than the work.
 """
 from __future__ import annotations
 
-from vramfit import budget, cache, devices, load, measure, quants, solve
+from vramfit import (budget, cache, devices, jsonout, load, measure,
+                     quants, solve)
 
 GIB = 1024 ** 3
 MIB = 1024 ** 2
@@ -112,6 +113,7 @@ def add_parser(sub):
                    help="largest -ngl that fits")
     p.add_argument("--parallel", type=int, default=1,
                    help="server slots; the cache is per slot")
+    p.add_argument("--json", action="store_true")
     add_target_args(p)
     p.set_defaults(fn=run)
     return p
@@ -142,21 +144,20 @@ def run(args) -> int:
     context = args.context or sh.train_context or 4096
     effective = context * max(1, args.parallel)
 
-    label = (f"{sh.name}  {sh.params / 1e9:.2f}B" if sh.params
-             else sh.name)
-    print(f"{label}  ({how})")
-    if dev is not None and not args.vram:
-        print(f"against {dev.tag}")
-    if args.parallel > 1:
-        print(f"{args.parallel} slots: cache budgeted for "
-              f"{effective} tokens")
-    print()
-
     if args.max_layers:
         if vram is None:
             print("need --vram or a visible device")
             return 2
         n = solve.max_gpu_layers(sh, vram, effective, **kw)
+        b = budget.build(sh, effective, n_gpu_layers=n, **kw)
+        if args.json:
+            out = jsonout.budget_dict(sh, effective, b, vram=vram,
+                                      source=how)
+            out["max_gpu_layers"] = n
+            print(jsonout.dump(out))
+            return 0 if n else 1
+        print(f"{sh.name}  ({how})")
+        print()
         if n == sh.n_layers:
             print(f"fits outright at ctx {context}: all {n} layers")
         elif n == 0:
@@ -166,8 +167,7 @@ def run(args) -> int:
             print(f"largest -ngl that fits at ctx {context}: "
                   f"{n} of {sh.n_layers}")
         print()
-        print(budget.build(sh, effective, n_gpu_layers=n,
-                           **kw).table())
+        print(b.table())
         return 0
 
     if args.max_context:
@@ -175,16 +175,25 @@ def run(args) -> int:
             print("need --vram or a visible device")
             return 2
         ctx = solve.max_context(sh, vram, **kw)
+        b = budget.build(sh, max(ctx, 1), **kw)
+        if args.json:
+            out = jsonout.budget_dict(sh, ctx, b, vram=vram,
+                                      source=how)
+            out["max_context"] = ctx
+            print(jsonout.dump(out))
+            return 0 if ctx else 1
+        print(f"{sh.name}  ({how})")
+        print()
         if not ctx:
             print(f"does not fit at any context in "
                   f"{vram / GIB:.1f} GiB")
             return 1
-        per_slot = ctx // max(1, args.parallel)
         print(f"largest context that fits: {ctx} ({human_ctx(ctx)})")
         if args.parallel > 1:
-            print(f"  {per_slot} per slot across {args.parallel} slots")
+            print(f"  {ctx // args.parallel} per slot across "
+                  f"{args.parallel} slots")
         print()
-        print(budget.build(sh, ctx, **kw).table())
+        print(b.table())
         return 0
 
     if args.for_context:
@@ -194,6 +203,15 @@ def run(args) -> int:
         kw.pop("weights_override")
         want = args.for_context * max(1, args.parallel)
         q, b = solve.quant_for_context(sh, want, vram, **kw)
+        if args.json:
+            print(jsonout.dump(
+                {"model": sh.name, "context": args.for_context,
+                 "quant": q.name if q else None,
+                 "bits_per_weight": q.bpw if q else None,
+                 "source": q.source if q else None}))
+            return 0 if q else 1
+        print(f"{sh.name}  ({how})")
+        print()
         if q is None:
             print(f"{human_ctx(args.for_context)} does not fit in "
                   f"{vram / GIB:.1f} GiB at any quant on the ladder")
@@ -205,6 +223,20 @@ def run(args) -> int:
         return 0
 
     b = budget.build(sh, effective, **kw)
+    if args.json:
+        print(jsonout.dump(jsonout.budget_dict(
+            sh, effective, b, vram=vram, source=how)))
+        return 0 if vram is None or vram >= b.total else 1
+
+    label = (f"{sh.name}  {sh.params / 1e9:.2f}B" if sh.params
+             else sh.name)
+    print(f"{label}  ({how})")
+    if dev is not None and not args.vram:
+        print(f"against {dev.tag}")
+    if args.parallel > 1:
+        print(f"{args.parallel} slots: cache budgeted for "
+              f"{effective} tokens")
+    print()
     print(f"ctx {context}")
     print(b.table())
     if vram is None:

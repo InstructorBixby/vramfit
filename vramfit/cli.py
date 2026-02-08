@@ -1,14 +1,15 @@
 """vramfit entry point.
 
 Thin: argument wiring and the small subcommands. Anything with more than
-a couple of flags lives in its own `cmd_*` module.
+a couple of flags lives in its own module.
 """
 from __future__ import annotations
 
 import argparse
 
 from vramfit import (budget, cmd_bench, cmd_fit, cmd_ledger, cmd_plan,
-                     devices, load, measure, quants, solve, specs)
+                     devices, explain, load, measure, quants, solve,
+                     specs)
 
 GIB = 1024 ** 3
 MIB = 1024 ** 2
@@ -51,11 +52,20 @@ def cmd_ladder(args) -> int:
         print("need --vram or a visible device")
         return 2
     kw = cmd_fit.budget_kwargs(args, dev)
+    rows = solve.context_ladder(sh, vram, **kw)
+    if args.json:
+        from vramfit import jsonout
+        print(jsonout.dump([
+            {"quant": q.name, "bits_per_weight": q.bpw,
+             "source": q.source,
+             "weight_bytes": int(sh.params * q.bpw / 8),
+             "max_context": ctx} for q, ctx in rows]))
+        return 0
     print(f"{sh.name}  in {vram / GIB:.1f} GiB  "
           f"({args.cache_type} cache)")
     print()
     print(f"{'quant':16} {'bpw':>5}  {'weights':>9}  {'max ctx':>9}")
-    for q, ctx in solve.context_ladder(sh, vram, **kw):
+    for q, ctx in rows:
         w = sh.params * q.bpw / 8
         print(f"{q.name:16} {q.bpw:5.2f}  {w / GIB:7.2f} GiB  "
               f"{human_ctx(ctx):>9}")
@@ -115,9 +125,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     cmd_fit.add_parser(sub)
     cmd_plan.add_parser(sub)
+    explain.add_parser(sub)
 
     p = sub.add_parser("ladder", help="quant against max context")
     p.add_argument("model")
+    p.add_argument("--json", action="store_true")
     cmd_fit.add_target_args(p)
     p.set_defaults(fn=cmd_ladder)
 
