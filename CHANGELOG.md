@@ -2,6 +2,28 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [0.7.0]
+
+### Added
+- `vramfit explain`: the whole derivation, with every line naming
+  its source -- file, vendor table, measurement on this machine,
+  or policy. The last two are the ones worth arguing with.
+- `--json` on the prediction subcommands. Flat schema, every
+  number in bytes, `assumptions` included rather than footnoted.
+- `--reserve`, and `--parallel` for server slots, where the cache
+  is per slot and the flag is easy to forget.
+- `bench` samples peak used memory during the run and prints it
+  next to the prediction, so the error is a measurement.
+- `docs/oom.md`: why a model that loads can still die later.
+
+### Changed
+- `fit --context` defaults to the model's trained context instead
+  of 4096. The old default made the optimistic answer the easy one
+  to get, and a conversation outgrows 4096 in an afternoon.
+- A fit whose slack is under 5% of the card is reported as a
+  maybe. That much slack is inside the error bars of the
+  compute-buffer term.
+
 ## [0.6.0]
 
 ### Added
