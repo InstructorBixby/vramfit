@@ -4,17 +4,44 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vramfit"
-version = "0.7.0"
+version = "0.7.1"
 description = "Predict whether a model fits in your VRAM, then measure what it does"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = {file = "LICENSE"}
 authors = [{name = "c01n31pan1c", email = "panic@c01n31.net"}]
+keywords = ["llm", "gguf", "vram", "quantisation", "benchmark",
+            "llama.cpp", "vllm", "exllamav2"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Benchmark",
+    "Typing :: Typed",
+]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/c01n31pan1c/vramfit"
+Documentation = "https://c01n31pan1c.github.io/vramfit/"
+Changelog = "https://github.com/c01n31pan1c/vramfit/blob/main/CHANGELOG.md"
+Issues = "https://github.com/c01n31pan1c/vramfit/issues"
+
 [project.optional-dependencies]
-dev = ["pytest>=7", "ruff>=0.1"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.9"]
 nvml = ["nvidia-ml-py>=12"]
+docs = ["mkdocs>=1.5", "mkdocs-material>=9.5"]
+all = ["nvidia-ml-py>=12"]
 
 [project.scripts]
 vramfit = "vramfit.cli:main"
@@ -23,12 +50,32 @@ vramfit = "vramfit.cli:main"
 include = ["vramfit*"]
 
 [tool.setuptools.package-data]
-vramfit = ["data/*.csv"]
+vramfit = ["data/*.csv", "schema/*.json", "py.typed"]
 
 [tool.ruff]
 line-length = 88
 target-version = "py310"
 select = ["E", "F", "W", "I", "B", "UP"]
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = ["pynvml.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+branch = true
+source = ["vramfit"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:",
+                 "raise NotImplementedError"]
