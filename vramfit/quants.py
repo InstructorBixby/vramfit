@@ -15,7 +15,7 @@ table.
 | gguf K-mixes | measured | the `_M` mixes are architecture-dependent |
 
 The GGUF numbers below are *observed* effective bpw averaged over the
-llama-family files I have on disk, and they are a fallback for planning
+llama-family files on disk here, and they are a fallback for planning
 only. Anything with a file reads the file.
 """
 from __future__ import annotations
@@ -63,6 +63,9 @@ LADDER = [
 ]
 
 BY_NAME = {q.name: q for q in LADDER}
+# Public alias: api.py reads this, and renaming BY_NAME later must not
+# break an import.
+LADDER_BY_NAME = BY_NAME
 
 
 def exl2(bpw: float) -> QuantEstimate:
@@ -71,7 +74,7 @@ def exl2(bpw: float) -> QuantEstimate:
 
 
 def lookup(name: str) -> QuantEstimate | None:
-    n = name.strip().lower().replace("_k_m", "_k_m")
+    n = name.strip().lower()
     if n.startswith("exl2-"):
         try:
             return exl2(float(n.split("-", 1)[1]))
