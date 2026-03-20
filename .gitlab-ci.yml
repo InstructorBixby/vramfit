@@ -1,14 +1,34 @@
 # The docker runner on hv1. Nothing in here needs a GPU, which is
 # most of the reason the tests are arithmetic over committed header
 # fixtures rather than against a card.
+#
+# There is no Windows runner on this instance, so the Windows path --
+# the nvidia-smi fallback and the ledger's default path -- gets checked
+# by hand on the work laptop and nowhere else. Written down because the
+# absence of a red pipeline is not evidence about it.
 stages:
   - test
 
-test:
-  stage: test
-  image: python:3.11-slim
+.py:
+  image: python:$PY-slim
   before_script:
     - pip install -e ".[dev]"
+
+test:
+  extends: .py
+  stage: test
+  parallel:
+    matrix:
+      - PY: ["3.10", "3.11", "3.12", "3.13"]
+  script:
+    - pytest --cov --cov-report=term-missing
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+
+lint:
+  extends: .py
+  stage: test
+  variables:
+    PY: "3.12"
   script:
     - ruff check .
-    - pytest -q
+    - mypy vramfit
