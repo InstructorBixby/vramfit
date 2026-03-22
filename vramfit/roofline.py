@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from vramfit import budget
+from vramfit.shape import Shape
 
 
 @dataclass
@@ -19,8 +20,8 @@ class Ceiling:
     flops_per_token: int = 0
 
 
-def decode_bytes_per_token(shape, context: int,
-                           cache_dtype_bytes: int = 2,
+def decode_bytes_per_token(shape: Shape, context: int,
+                           cache_dtype_bytes: float = 2,
                            weights: int | None = None) -> int:
     """Bytes that must cross the memory bus to emit one token.
 
@@ -33,8 +34,8 @@ def decode_bytes_per_token(shape, context: int,
     return w + budget.kv_bytes(shape, context, cache_dtype_bytes)
 
 
-def decode_ceiling(shape, context: int, bandwidth_bps: float,
-                   cache_dtype_bytes: int = 2,
+def decode_ceiling(shape: Shape, context: int, bandwidth_bps: float,
+                   cache_dtype_bytes: float = 2,
                    weights: int | None = None) -> Ceiling:
     per = decode_bytes_per_token(shape, context, cache_dtype_bytes,
                                  weights)
@@ -42,12 +43,12 @@ def decode_ceiling(shape, context: int, bandwidth_bps: float,
                    bytes_per_token=per)
 
 
-def prefill_flops_per_token(shape) -> int:
+def prefill_flops_per_token(shape: Shape) -> int:
     """Two FLOPs per parameter, attention term ignored. See docs."""
     return 2 * shape.params
 
 
-def prefill_ceiling(shape, flops: float) -> Ceiling:
+def prefill_ceiling(shape: Shape, flops: float) -> Ceiling:
     per = prefill_flops_per_token(shape)
     return Ceiling(tok_s=flops / per, basis="flops",
                    flops_per_token=per)
@@ -73,6 +74,6 @@ def verdict(fraction: float) -> str:
     if fraction >= 0.5:
         return "near the roof: some headroom in the backend"
     if fraction >= 0.25:
-        return "leaving performance on the table: check offload, "\
-               "build flags, batch size"
+        return ("leaving performance on the table: check offload, "
+                "build flags, batch size")
     return "far off the roof: something is wrong, not slow"

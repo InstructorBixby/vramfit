@@ -28,8 +28,8 @@ class Spec:
         return self.bandwidth_gbs * 1e9
 
 
-def load(path=TABLE) -> dict:
-    out = {}
+def load(path: str | Path = TABLE) -> dict[str, Spec]:
+    out: dict[str, Spec] = {}
     with open(path, newline="", encoding="utf-8") as fh:
         rows = csv.DictReader(
             (ln for ln in fh if not ln.startswith("#")))
@@ -44,7 +44,8 @@ def load(path=TABLE) -> dict:
     return out
 
 
-def lookup(device_name: str, table=None):
+def lookup(device_name: str,
+           table: dict[str, Spec] | None = None) -> Spec | None:
     """Spec for a device, or None. None is a supported answer."""
     from vramfit import devices
 
