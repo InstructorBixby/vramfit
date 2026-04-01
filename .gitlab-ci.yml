@@ -8,6 +8,7 @@
 # absence of a red pipeline is not evidence about it.
 stages:
   - test
+  - docs
 
 .py:
   image: python:$PY-slim
@@ -32,3 +33,33 @@ lint:
   script:
     - ruff check .
     - mypy vramfit
+
+docs:
+  # --strict, because a broken link in the budget page is how I end up
+  # re-deriving a term I already wrote down.
+  stage: docs
+  image: python:3.12-slim
+  before_script:
+    - pip install -e ".[docs]"
+  script:
+    - mkdocs build --strict --site-dir public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+
+pages:
+  # Same build; this is the one the instance serves, so I can read the
+  # budget page on the phone instead of opening the checkout.
+  stage: docs
+  image: python:3.12-slim
+  before_script:
+    - pip install -e ".[docs]"
+  script:
+    - mkdocs build --strict --site-dir public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
