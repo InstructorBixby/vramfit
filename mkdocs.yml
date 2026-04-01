@@ -1,0 +1,35 @@
+site_name: vramfit
+site_description: Predict whether a model fits in your VRAM, then measure what it does
+repo_url: https://github.com/c01n31pan1c/vramfit
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.top
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/weather-night, name: dark}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/weather-sunny, name: light}
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: {permalink: true}
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - How it works:
+      - The VRAM budget: budget.md
+      - The two speeds: speed.md
+      - Partial offload: offload.md
+      - Backends: backends.md
+  - Running out later: oom.md
+  - Where this is wrong: wrong.md
