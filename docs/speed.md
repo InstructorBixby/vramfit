@@ -57,3 +57,11 @@ reporting the fraction.
   assumption that the decode ceiling rests on entirely.
 - Batched serving. All of the above is batch size 1, which is the
   interactive case and not the throughput case.
+
+## see also
+
+- [the VRAM budget](budget.md), since the cache term drives both the
+  capacity answer and the decode ceiling.
+- [the ledger](ledger.md), which is where a measured fraction goes so
+  that it can be compared to the next one.
+- [where this is wrong](wrong.md).

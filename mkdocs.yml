@@ -31,5 +31,6 @@ nav:
       - The two speeds: speed.md
       - Partial offload: offload.md
       - Backends: backends.md
+  - Keeping the numbers: ledger.md
   - Running out later: oom.md
   - Where this is wrong: wrong.md
