@@ -9,6 +9,7 @@
 stages:
   - test
   - docs
+  - maintenance
 
 .py:
   image: python:$PY-slim
@@ -63,3 +64,18 @@ pages:
       - public
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+freshness:
+  # Nothing is going to open a merge request here on its own. A weekly
+  # scheduled pipeline tells me what has drifted and then I decide,
+  # which is the same outcome with one fewer moving part. Allowed to
+  # fail, because drift is information and not a broken build.
+  extends: .py
+  stage: maintenance
+  variables:
+    PY: "3.12"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: true
+  script:
+    - pip list --outdated
