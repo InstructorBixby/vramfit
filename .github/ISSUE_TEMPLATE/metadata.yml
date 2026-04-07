@@ -1,0 +1,24 @@
+name: Model metadata read wrongly
+description: Wrong layer count, head count, context length or bpw
+labels: [metadata]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Paste `vramfit shape --json <model>` below. That output contains
+        everything needed to reproduce a metadata bug without the
+        weights, which are the part nobody can send.
+  - type: textarea
+    id: shape
+    attributes:
+      label: vramfit shape --json
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What the right numbers are, and where they come from
+      description: A model card, a config.json, the architecture paper.
+    validations:
+      required: true

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question about a number
+    url: https://github.com/c01n31pan1c/vramfit/discussions
+    about: >
+      If the question is "why does it say that", run
+      `vramfit explain` first -- it prints the whole derivation with
+      the source of every term.
