@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import argparse
 
-from vramfit import (budget, cmd_bench, cmd_fit, cmd_ledger, cmd_plan,
-                     devices, explain, load, measure, quants, solve,
-                     specs)
+from vramfit import (__version__, budget, cmd_bench, cmd_fit,
+                     cmd_ledger, cmd_plan, devices, explain, load,
+                     measure, quants, solve, specs)
 
 GIB = 1024 ** 3
 MIB = 1024 ** 2
@@ -21,8 +21,21 @@ resolve_vram = cmd_fit.resolve_vram
 cuda_context_for = cmd_fit.cuda_context_for
 
 
-def cmd_shape(args) -> int:
+def cmd_shape(args: argparse.Namespace) -> int:
     sh, how = load.load(args.model)
+    if getattr(args, "json", False):
+        from vramfit import jsonout
+        print(jsonout.dump({
+            "model": sh.name, "arch": sh.arch, "source": how,
+            "params": sh.params,
+            "bits_per_weight": round(sh.bpw, 4) if sh.params else None,
+            "layers": sh.n_layers, "attention_heads": sh.n_head,
+            "kv_heads": sh.n_head_kv, "head_dim": sh.head_dim,
+            "vocab": sh.vocab, "trained_context": sh.train_context,
+            "kv_bytes_per_token": budget.kv_bytes_per_token(sh),
+            "quant_mix": sh.quant_mix() if sh.params else {},
+        }))
+        return 0
     print(f"name          {sh.name}")
     print(f"source        {how}")
     print(f"arch          {sh.arch}")
@@ -44,7 +57,7 @@ def cmd_shape(args) -> int:
     return 0
 
 
-def cmd_ladder(args) -> int:
+def cmd_ladder(args: argparse.Namespace) -> int:
     sh, _ = load.load(args.model)
     dev = pick_device(args.device)
     vram = resolve_vram(args, dev)
@@ -72,14 +85,14 @@ def cmd_ladder(args) -> int:
     return 0
 
 
-def cmd_quants(args) -> int:
+def cmd_quants(args: argparse.Namespace) -> int:
     print(f"{'name':18} {'bpw':>5}  source")
     for q in sorted(quants.LADDER, key=lambda q: q.bpw):
         print(f"{q.name:18} {q.bpw:5.2f}  {q.source}")
     return 0
 
 
-def cmd_devices(args) -> int:
+def cmd_devices(args: argparse.Namespace) -> int:
     found = devices.discover()
     if not found:
         print("no CUDA devices visible")
@@ -90,6 +103,8 @@ def cmd_devices(args) -> int:
         spec = table.get(devices.normalise(d.name))
         if spec is None:
             print("    no spec row: bandwidth ratios unavailable")
+            print("    a pull request adding it is welcome; see "
+                  "CONTRIBUTING.md")
         else:
             print(f"    peak {spec.bandwidth_gbs:.1f} GB/s, "
                   f"{spec.fp16_tflops:.1f} TFLOP/s fp16 "
@@ -102,7 +117,7 @@ def cmd_devices(args) -> int:
     return 0
 
 
-def cmd_calibrate(args) -> int:
+def cmd_calibrate(args: argparse.Namespace) -> int:
     dev = pick_device(args.device)
     if dev is None:
         print(f"device {args.device} not visible")
@@ -117,10 +132,13 @@ def cmd_calibrate(args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="vramfit")
+    ap.add_argument("--version", action="version",
+                    version=f"vramfit {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("shape", help="what the metadata says")
     p.add_argument("model")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(fn=cmd_shape)
 
     cmd_fit.add_parser(sub)
@@ -149,9 +167,10 @@ def build_parser() -> argparse.ArgumentParser:
     return ap
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return args.fn(args)
+    rc: int = args.fn(args)
+    return rc
 
 
 if __name__ == "__main__":
