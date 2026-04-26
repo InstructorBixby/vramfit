@@ -1,96 +1,129 @@
 # vramfit
 
-Will this model fit in this card, and roughly how fast will it be.
+[![ci](https://github.com/c01n31pan1c/vramfit/actions/workflows/ci.yml/badge.svg)](https://github.com/c01n31pan1c/vramfit/actions/workflows/ci.yml)
+[![pypi](https://img.shields.io/pypi/v/vramfit.svg)](https://pypi.org/project/vramfit/)
+[![python](https://img.shields.io/pypi/pyversions/vramfit.svg)](https://pypi.org/project/vramfit/)
+[![license](https://img.shields.io/pypi/l/vramfit.svg)](LICENSE)
 
-Both halves with arithmetic over the model's own metadata, then a
-measurement to find out how wrong the arithmetic was.
+**Will this model fit in this card, and roughly how fast will it be.**
+
+Answered with arithmetic over metadata the model file already contains,
+instead of by downloading five gigabytes and watching what happens. Then
+measured, so the arithmetic can be checked and the error kept.
 
 ## install
 
-    pip install -e ".[dev]"
-    pip install -e ".[nvml]"   # optional, nvidia-smi works too
+    pip install vramfit
+    pip install "vramfit[nvml]"   # optional; nvidia-smi works too
 
-## use
+## quickstart
 
     vramfit devices
-    vramfit calibrate
+    vramfit calibrate                  # once per machine
 
-    # will it fit
-    vramfit fit models/llama-3.1-8b-instruct-q4_k_m.gguf \
-        --context 8192 --vram 16GiB
-
-    # what is the most context i can have
-    vramfit fit models/llama-3.1-8b-instruct-q4_k_m.gguf \
-        --max-context --vram 16GiB
-
-    # i need 32k, what do i have to download
-    vramfit fit models/llama-3.1-8b-instruct-q4_k_m.gguf \
-        --for-context 32768 --vram 16GiB
-
-    # quant against max context, all rungs
+    vramfit fit  ./Llama-3.1-8B-Instruct-Q4_K_M.gguf --vram 16GiB
+    vramfit fit  ./Llama-3.1-8B-Instruct-Q4_K_M.gguf --max-context
+    vramfit fit  ./Llama-3.1-8B-Instruct-Q4_K_M.gguf --for-context 32768
     vramfit ladder ./Qwen2.5-32B-Instruct --vram 24GiB
+    vramfit explain ./Llama-3.1-8B-Instruct-Q4_K_M.gguf --context 8192
+    vramfit bench ./Llama-3.1-8B-Instruct-Q4_K_M.gguf --record
 
-    # and now measure it
-    vramfit bench models/llama-3.1-8b-instruct-q4_k_m.gguf \
-        --context 8192
+`fit` exits 1 when it does not fit, so it drops into a script. `--json`
+on the prediction subcommands gives a flat schema with every number in
+bytes.
 
-`fit` exits 1 when it does not fit, so it works in a script.
+## worked example
 
-## what it computes
+An 8B at Q4_K_M, on a 16 GiB card, and the question is how much context
+is actually available.
 
-Five VRAM terms, kept separate on purpose, because when a prediction
-misses the only useful question is which term missed.
+    $ vramfit fit ./Llama-3.1-8B-Instruct-Q4_K_M.gguf --max-context --vram 16GiB
+    Meta-Llama-3.1-8B-Instruct  8.03B  4.83 bpw  (gguf header)
 
-| term | source |
-|---|---|
-| weights | sum over the tensor table, exact |
-| kv cache | `2 x layers x kv_heads x head_dim x context x dtype` |
-| compute buffer | batch x vocab x 4 plus hidden terms, rough |
-| cuda context | measured by `vramfit calibrate`, cached per driver |
-| headroom | 3% for fragmentation, a policy |
+    largest context that fits: 55296 (54k)
 
-And two speeds, which are different problems:
+    weights             4.520 GiB
+    kv cache            6.750 GiB
+    compute buffer      0.296 GiB
+    cuda context        0.297 GiB
+    headroom            0.356 GiB
+    total              12.219 GiB
 
-| measurement | bound by | ceiling |
+Two things to notice. The cache is bigger than the weights -- past about
+35k context on this model it is the dominant term, and nothing about the
+quant choice changes that. And the quant is 4.83 bits per weight, not
+4.5, because `_M` is a mix.
+
+Cutting the cache to q8_0 buys most of the rest of the window:
+
+    $ vramfit fit ./Llama-3.1-8B-Instruct-Q4_K_M.gguf \
+          --max-context --vram 16GiB --cache-type q8_0 --flash-attn
+    largest context that fits: 101888 (99k)
+
+Then check it:
+
+    $ vramfit bench ./Llama-3.1-8B-Instruct-Q4_K_M.gguf --context 8192
+    Meta-Llama-3.1-8B-Instruct q4_k_m ctx 8192 llama.cpp on NVIDIA GeForce RTX 3090
+      prefill   2914.3 tok/s  (25% of flops peak)
+      decode     118.5 tok/s  (82% of bandwidth peak, 768 GB/s)
+      vram    predicted  5.414 GiB  measured peak  5.502 GiB  (+1.6%)
+
+82% of peak memory bandwidth on decode means the backend is doing about
+as well as the hardware allows and the only remaining lever is reading
+fewer bytes per token. That is the output worth having: absolute tok/s
+cannot tell "the card is saturated" from "half the card is idle".
+
+## versus doing it by hand
+
+The usual back-of-envelope is `params x bits / 8`, plus a fudge factor,
+plus a guess at the cache. Where that goes wrong:
+
+| | by hand | vramfit |
 |---|---|---|
-| prompt processing | arithmetic | `peak_flops / (2 x params)` |
-| token generation | memory bandwidth | `peak_bw / bytes_per_token` |
+| bits per weight | 4.0 or 4.5 from the quant name | 4.83, summed over the tensor table |
+| kv cache heads | attention heads | `head_count_kv` -- 4x smaller here, 32x on MQA |
+| cache dtype | assumed f16 | q8_0 costs 8.5 bits, not 8 |
+| cuda context | in the fudge factor | measured per (device, driver) |
+| partial offload | weights scaled by layer fraction | cache scaled too, embeddings not |
+| speed | one tok/s number | prefill and decode, each against its own ceiling |
 
-The fraction of the ceiling is the number worth reading. 80% of peak
-bandwidth on decode means the only remaining lever is reading fewer
-bytes per token; 35% means the backend or the build is leaving half the
-card idle. Absolute tok/s cannot distinguish those.
-
-## two details that make the numbers trustworthy
-
-**Bits per weight comes from the tensor table.** A Q4_K_M file is about
-4.83 bpw, not 4.5: the `_M` suffix is a *mix*, where the output tensor
-and some `attn_v` / `ffn_down` layers are quantised heavier. Using 4.5
-under-predicts an 8B by nearly half a gigabyte.
-
-**The cache is sized with `n_head_kv`.** Under grouped-query attention
-that is a quarter of the attention head count, and under multi-query
-attention it is 1. Using `n_head` over-predicts the cache by the GQA
-ratio, which is enough to tell you a model does not fit when it fits
-four times over.
+On the example above, the by-hand version lands at about 4.2 GiB of
+weights against 4.52 real, and over-predicts the cache by 4x. Those two
+errors point in opposite directions, which is why the fudge factor
+appears to work until the day it does not.
 
 ## where this is wrong
 
+The honest list, in full, is [docs/wrong.md](docs/wrong.md). The short
+version:
+
 - **Fragmentation is a policy, not a prediction.** The 3% headroom is a
-  number that has worked here. An allocator that has been churning for
-  an hour behaves differently from a fresh process.
+  number that has worked here; free memory is a total, not the largest
+  contiguous block.
 - **The compute buffer is backend-specific** and only llama.cpp's shape
-  of it is modelled. A backend that preallocates its cache in blocks,
-  or batches more aggressively, will not match.
-- **It predicts load, not life.** The cache term is for a full context.
-  A process that loads happily can still die later, because the cache
-  grows as the conversation does.
-- **Speculative decoding breaks the decode ceiling** -- it is derived
-  from one forward pass per token, which is exactly the assumption a
-  draft model removes. The ratio becomes meaningless, not merely
-  inaccurate.
+  of it is modelled.
+- **It predicts load, not life.** The cache grows with the
+  conversation, so a model that loads can still die an hour later.
+- **Speculative decoding invalidates the decode ceiling** -- it removes
+  the one-forward-pass-per-token assumption the ceiling rests on.
 - **Attention FLOPs are not in the prefill ceiling**, so long-context
   prefill ceilings are optimistic.
-- **`data/gpus.csv` is vendor specifications.** Used only as
-  denominators; an unknown card gets no ratio rather than a plausible
-  one.
+- **`data/gpus.csv` is vendor numbers**, used only as denominators. An
+  unknown card gets no ratio rather than a plausible one.
+
+## layout
+
+| path | what |
+|---|---|
+| `vramfit/api.py` | the public API; everything else is internal |
+| `vramfit/gguf.py`, `safetensors.py`, `hfconfig.py` | metadata readers |
+| `vramfit/ggml_types.py` | block geometry, and therefore exact bpw |
+| `vramfit/budget.py` | the five VRAM terms |
+| `vramfit/solve.py` | invert it: max context, min quant, max `-ngl` |
+| `vramfit/roofline.py` | the two ceilings |
+| `vramfit/bench/` | one module per backend |
+| `vramfit/ledger.py` | measurements, kept and diffable |
+
+## licence
+
+MIT. See [LICENSE](LICENSE).
