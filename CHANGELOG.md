@@ -2,6 +2,22 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [0.7.1]
+
+### Added
+- Typed public API in `vramfit.api`, and `py.typed`. Everything
+  else in the package is internal.
+- Full package metadata, so an index page says something.
+- `--version`, and `shape --json`.
+- Docs site, `SECURITY.md`, `CONTRIBUTING.md`, `LICENSE`, issue
+  and PR templates, Dependabot.
+- Release workflow publishing through PyPI trusted publishing.
+- `docs/stability.md`, which is what 1.0 will be promising.
+
+### Changed
+- CI runs ruff, mypy and coverage across 3.10 to 3.13.
+- `devices` points at CONTRIBUTING.md when a card has no spec row.
+
 ## [0.7.0]
 
 ### Added
