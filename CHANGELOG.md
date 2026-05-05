@@ -2,6 +2,27 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [0.7.1]
+
+### Added
+- Typed public API in `vramfit.api`, and `py.typed`. Everything
+  else in the package is internal.
+- Full package metadata, so an index page says something.
+- `--version`, and `shape --json`.
+- Docs site, `LICENSE`, `docs/working-on-this.md`,
+  `docs/failure-modes.md` and `docs/checklists.md` -- the two
+  checklists I keep skipping when I am tired.
+- `scripts/release.sh`, which refuses to tag unless the version,
+  the changelog and a wheel built from the tree all agree.
+- `docs/stability.md`, which is what 1.0 will be fixing in place.
+
+### Changed
+- The pipeline runs ruff, mypy and coverage across 3.10 to 3.13,
+  and a scheduled job reports dependency drift instead of a bot
+  opening merge requests at me.
+- `devices` says to add a row to `data/gpus.csv` with a citation
+  when a card has no spec row.
+
 ## [0.7.0]
 
 ### Added
