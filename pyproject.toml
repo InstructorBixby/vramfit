@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vramfit"
-version = "0.7.1"
+version = "1.0.0"
 description = "Predict whether a model fits in your VRAM, then measure what it does"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ authors = [{name = "c01n31pan1c", email = "panic@c01n31.net"}]
 keywords = ["llm", "gguf", "vram", "quantisation", "benchmark",
             "llama.cpp", "vllm", "exllamav2"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: GPU :: NVIDIA CUDA",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
@@ -53,7 +53,9 @@ vramfit = ["data/*.csv", "schema/*.json", "py.typed"]
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-select = ["E", "F", "W", "I", "B", "UP"]
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ANN", "RET", "SIM"]
+ignore = ["ANN401"]
 [tool.mypy]
 python_version = "3.10"
 warn_unused_ignores = true

@@ -2,6 +2,21 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [1.0.0]
+
+### Changed
+- Nothing. 1.0.0 is the same code as 0.7.1 with a promise
+  attached: see `docs/stability.md`. The number exists so that a
+  ledger row can say which arithmetic produced it, and so that
+  the two other repositories importing `vramfit.api` have
+  something to pin. Holding it at 0.x while already depending on
+  it in three places was the less honest option.
+
+### Added
+- `Development Status :: 5 - Production/Stable`, which is a claim
+  about the interface and not about the predictions. Those are
+  still wrong in the ways `docs/wrong.md` lists.
+
 ## [0.7.1]
 
 ### Added
