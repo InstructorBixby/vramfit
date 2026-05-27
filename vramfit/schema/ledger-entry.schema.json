@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://git.c01n31.net/c01n31pan1c/vramfit/schema/ledger-entry.schema.json",
+  "title": "vramfit ledger entry",
+  "description": "One measurement, from one machine, with enough provenance to still be worth something in six months. Every required field is required because a measurement without it has already turned out to be unreproducible.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "model", "quant", "context", "backend", "backend_version",
+    "gpu", "driver", "cache_dtype", "decode_tok_s", "nvidia_smi"
+  ],
+  "properties": {
+    "model": {
+      "type": "string",
+      "minLength": 3,
+      "description": "The model as published, not a nickname. 'Meta-Llama-3.1-8B-Instruct', not '8b'."
+    },
+    "quant": {"type": "string", "minLength": 2},
+    "bits_per_weight": {
+      "type": "number", "minimum": 1, "maximum": 32,
+      "description": "From `vramfit shape`, if a GGUF was used."
+    },
+    "context": {"type": "integer", "minimum": 1},
+    "backend": {
+      "type": "string",
+      "enum": ["llama.cpp", "vllm", "exllamav2"]
+    },
+    "backend_version": {
+      "type": "string", "minLength": 3,
+      "description": "A build commit or a release version. 'latest' is not a version and will be rejected."
+    },
+    "gpu": {"type": "string", "minLength": 3},
+    "gpu_count": {"type": "integer", "minimum": 1, "default": 1},
+    "driver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+"},
+    "cache_dtype": {"type": "string"},
+    "n_gpu_layers": {"type": "integer", "minimum": 0},
+    "batch": {"type": "integer", "minimum": 1},
+    "flash_attn": {"type": "boolean"},
+    "prefill_tok_s": {"type": "number", "exclusiveMinimum": 0},
+    "decode_tok_s": {"type": "number", "exclusiveMinimum": 0},
+    "vram_peak_mib": {"type": "integer", "minimum": 0},
+    "nvidia_smi": {
+      "type": "string",
+      "minLength": 20,
+      "description": "Verbatim output of `nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv`. This is the field that settles which card a number came from, six months later, when I no longer have the machine."
+    },
+    "notes": {"type": "string"},
+    "measured_on": {
+      "type": "string",
+      "description": "Which machine. 'desk, slot 0', 'gpu box', 'work laptop', 'rented 4090, one afternoon'. Not optional in practice: a row I cannot place is a row I cannot defend."
+    }
+  }
+}
