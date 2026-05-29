@@ -1,0 +1,19 @@
+name: contributions
+
+on:
+  pull_request:
+    paths: ["contributions/**", "vramfit/data/gpus.csv"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: validate contributed measurements
+        run: vramfit contrib check contributions/
+      - name: the gpu table must stay parseable
+        run: python -c "from vramfit import specs; print(len(specs.load()), 'rows')"
