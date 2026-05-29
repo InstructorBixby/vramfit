@@ -35,6 +35,24 @@ lint:
     - ruff check .
     - mypy vramfit
 
+intake:
+  # Runs when I add a measurement or a card row, which is the moment
+  # the discipline is hardest to keep: I am back from the machine, I
+  # have the number, and the missing backend version feels like a
+  # detail. It is not, and this job is the only thing between me and
+  # a ledger full of rows I cannot place.
+  extends: .py
+  stage: test
+  variables:
+    PY: "3.12"
+  rules:
+    - changes:
+        - intake/**/*
+        - vramfit/data/gpus.csv
+  script:
+    - vramfit intake check intake/
+    - python -c "from vramfit import specs; print(len(specs.load()), 'rows')"
+
 docs:
   # --strict, because a broken link in the budget page is how I end up
   # re-deriving a term I already wrote down.
