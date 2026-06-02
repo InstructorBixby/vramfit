@@ -1,0 +1,20 @@
+{
+  "model": "Qwen2.5-32B-Instruct",
+  "quant": "q5_k_m",
+  "bits_per_weight": 5.69,
+  "context": 16384,
+  "backend": "llama.cpp",
+  "backend_version": "b4341",
+  "gpu": "NVIDIA RTX A6000",
+  "driver": "550.90.07",
+  "cache_dtype": "q8_0",
+  "n_gpu_layers": 65,
+  "batch": 512,
+  "flash_attn": true,
+  "prefill_tok_s": 1612.0,
+  "decode_tok_s": 21.4,
+  "vram_peak_mib": 25880,
+  "nvidia_smi": "name, memory.total [MiB], driver_version\nNVIDIA RTX A6000, 49140 MiB, 550.90.07",
+  "measured_on": "work laptop, thunderbolt dock",
+  "notes": "the dock card, power limited to 275W; nothing else was on it"
+}

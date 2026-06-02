@@ -1,0 +1,40 @@
+[
+  {
+    "model": "Meta-Llama-3.1-8B-Instruct",
+    "quant": "q4_k_m",
+    "bits_per_weight": 4.83,
+    "context": 8192,
+    "backend": "llama.cpp",
+    "backend_version": "b4341",
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "driver": "560.35.03",
+    "cache_dtype": "f16",
+    "n_gpu_layers": 33,
+    "batch": 512,
+    "flash_attn": true,
+    "prefill_tok_s": 7421.0,
+    "decode_tok_s": 138.6,
+    "vram_peak_mib": 5648,
+    "nvidia_smi": "name, memory.total [MiB], driver_version\nNVIDIA GeForce RTX 4090, 24564 MiB, 560.35.03",
+    "measured_on": "rented 4090, one afternoon"
+  },
+  {
+    "model": "Meta-Llama-3.1-8B-Instruct",
+    "quant": "q4_k_m",
+    "bits_per_weight": 4.83,
+    "context": 32768,
+    "backend": "llama.cpp",
+    "backend_version": "b4341",
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "driver": "560.35.03",
+    "cache_dtype": "f16",
+    "n_gpu_layers": 33,
+    "batch": 512,
+    "flash_attn": true,
+    "prefill_tok_s": 6980.0,
+    "decode_tok_s": 87.9,
+    "vram_peak_mib": 9712,
+    "nvidia_smi": "name, memory.total [MiB], driver_version\nNVIDIA GeForce RTX 4090, 24564 MiB, 560.35.03",
+    "measured_on": "rented 4090, one afternoon"
+  }
+]
