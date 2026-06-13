@@ -1,0 +1,20 @@
+# Published architectures, for sizing a measurement taken on a machine
+# whose weights are not coming back with me. Every number is out of the
+# model's own config.json and can be checked against it.
+#
+# n_ff is intermediate_size, and it is a COLUMN rather than a ratio
+# because the ratio is not a constant. The llama family is n_embd*3.5,
+# which is why guessing worked for as long as I only had those: Qwen2.5
+# 32B is 5.40x and Mistral-Small is 6.40x, and guessing 3.5 there
+# undercounts a 32B model as 23B. A parameter count that is 30% light
+# makes the bandwidth fraction 30% light with it, which is the one
+# column this table exists for.
+model,arch,layers,n_embd,n_ff,n_head,n_head_kv,head_dim,vocab,train_context
+Meta-Llama-3.1-8B-Instruct,llama,32,4096,14336,32,8,128,128256,131072
+Meta-Llama-3.1-70B-Instruct,llama,80,8192,28672,64,8,128,128256,131072
+Qwen2.5-7B-Instruct,qwen2,28,3584,18944,28,4,128,152064,32768
+Qwen2.5-14B-Instruct,qwen2,48,5120,13824,40,8,128,152064,32768
+Qwen2.5-32B-Instruct,qwen2,64,5120,27648,40,8,128,152064,32768
+Qwen2.5-72B-Instruct,qwen2,80,8192,29568,64,8,128,152064,32768
+Mistral-7B-Instruct-v0.3,llama,32,4096,14336,32,8,128,32768,32768
+Mistral-Small-24B-Instruct,llama,40,5120,32768,32,8,128,131072,32768
