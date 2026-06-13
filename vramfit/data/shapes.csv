@@ -1,0 +1,12 @@
+# Published architectures, for sizing a contributed measurement whose
+# weights nobody can send. Every number is out of the model's own
+# config.json and can be checked against it.
+model,arch,layers,n_embd,n_head,n_head_kv,head_dim,vocab,train_context
+Meta-Llama-3.1-8B-Instruct,llama,32,4096,32,8,128,128256,131072
+Meta-Llama-3.1-70B-Instruct,llama,80,8192,64,8,128,128256,131072
+Qwen2.5-7B-Instruct,qwen2,28,3584,28,4,128,152064,32768
+Qwen2.5-14B-Instruct,qwen2,48,5120,40,8,128,152064,32768
+Qwen2.5-32B-Instruct,qwen2,64,5120,40,8,128,152064,32768
+Qwen2.5-72B-Instruct,qwen2,80,8192,64,8,128,152064,32768
+Mistral-7B-Instruct-v0.3,llama,32,4096,32,8,128,32768,32768
+Mistral-Small-24B-Instruct,llama,40,5120,32,8,128,131072,32768
