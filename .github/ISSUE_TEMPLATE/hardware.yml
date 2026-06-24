@@ -1,0 +1,70 @@
+name: Measurement from my hardware
+description: A number from a card, or a prediction that missed on one
+labels: [hardware, measurement]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Everything below is required because a report without it has
+        already turned out to be unreproducible. Three in a row went
+        nowhere for want of a backend version and a card size, which is
+        why this form exists instead of a free-text box.
+  - type: textarea
+    id: smi
+    attributes:
+      label: nvidia-smi output
+      description: >
+        `nvidia-smi --query-gpu=name,memory.total,driver_version
+        --format=csv`. A card name typed by hand is not a card: two
+        reports turned out to be the 12 GiB variant of a card assumed
+        to be 16, which made the predictions look wrong for a reason
+        that had nothing to do with the arithmetic.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: backend
+    attributes:
+      label: Backend and exact version
+      description: >
+        A build commit or a release tag. "latest" is not a version --
+        the point of the field is that somebody can build the same
+        thing later.
+      placeholder: "llama.cpp b4341"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model, as published
+      placeholder: "Meta-Llama-3.1-8B-Instruct"
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: vramfit shape --json
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: The exact backend command you ran
+      description: Including -ngl, -c, -b, flash attention, cache types.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: numbers
+    attributes:
+      label: What you measured, and what vramfit predicted
+      description: "`vramfit explain` output is ideal."
+    validations:
+      required: true
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Optional
+      options:
+        - label: Happy for this to go in `contributions/` with my handle on it

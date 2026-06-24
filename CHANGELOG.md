@@ -2,6 +2,27 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [1.1.0]
+
+### Added
+- A schema for contributed measurements, a validator, `vramfit
+  contrib check | import`, and a CI job that rejects a report
+  nobody could reproduce. Every required field is required because
+  a report without it has already gone nowhere.
+- `contributions/` and the published table at `docs/measured.md`,
+  built from it by `tools/build_measured_table.py`.
+- `vramfit/data/shapes.csv`: published architectures, so a
+  contributed number can be turned into a fraction of that card's
+  bandwidth without anybody shipping weights.
+- Issue template for a hardware report, asking for `nvidia-smi`
+  output and the exact backend version.
+- `Shape.params_from_config()` and `Shape.n_ff`.
+
+### Deprecated
+- `vramfit plan --utilisation`, renamed to
+  `--gpu-memory-utilization` to match vLLM's own spelling. The old
+  flag keeps working and warns; it will be removed in 2.0.
+
 ## [1.0.0]
 
 ### Changed
