@@ -2,6 +2,28 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [1.1.0]
+
+### Added
+- A schema for a measurement taken off-box, a validator,
+  `vramfit intake check | import`, and a pipeline job that
+  rejects an entry I would not be able to reproduce later. Every
+  required field is required because a measurement without it has
+  already gone nowhere -- `docs/unreproducible.md` has the three.
+- `intake/` and the table at `docs/measured.md`, built from it by
+  `tools/build_measured_table.py`.
+- `vramfit/data/shapes.csv`: published architectures, so a number
+  from a machine I no longer have can still be turned into a
+  fraction of that card's bandwidth without the weights.
+- `docs/unreproducible.md`: the three measurements I lost, and the
+  checklist to run through before the machine goes away.
+- `Shape.params_from_config()` and `Shape.n_ff`.
+
+### Deprecated
+- `vramfit plan --utilisation`, renamed to
+  `--gpu-memory-utilization` to match vLLM's own spelling. The old
+  flag keeps working and warns; it will be removed in 2.0.
+
 ## [1.0.0]
 
 ### Changed
