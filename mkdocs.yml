@@ -31,6 +31,12 @@ nav:
       - The two speeds: speed.md
       - Partial offload: offload.md
       - Backends: backends.md
-  - Keeping the numbers: ledger.md
+  - Measurements:
+      - Keeping the numbers: ledger.md
+      - Contributed results: measured.md
+      - Contributing a measurement: contributing-measurements.md
   - Running out later: oom.md
   - Where this is wrong: wrong.md
+  - Project:
+      - Stability: stability.md
+      - Releasing: releasing.md
