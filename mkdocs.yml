@@ -31,6 +31,16 @@ nav:
       - The two speeds: speed.md
       - Partial offload: offload.md
       - Backends: backends.md
-  - Keeping the numbers: ledger.md
+  - Measurements:
+      - Keeping the numbers: ledger.md
+      - What I have measured: measured.md
+      - Recording one off-box: measuring.md
+      - Three numbers I lost: unreproducible.md
   - Running out later: oom.md
   - Where this is wrong: wrong.md
+  - Notes to self:
+      - What I cannot break: stability.md
+      - How this breaks: failure-modes.md
+      - Working on this: working-on-this.md
+      - Two checklists: checklists.md
+      - Releasing: releasing.md
