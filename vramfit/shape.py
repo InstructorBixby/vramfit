@@ -3,6 +3,12 @@
 Deliberately small. Every number downstream -- weights, cache, buffers,
 the largest context that fits -- is a function of this and nothing else,
 so a reader for a new metadata format only has to produce one of these.
+
+K and V are sized separately. On most architectures they are the same
+and equal to `head_dim`, but GGUF has `attention.key_length` and
+`attention.value_length` precisely because they need not be, and a
+report of a 40% cache over-prediction turned out to be an architecture
+where `rope.dimension_count` is smaller than the key length.
 """
 from __future__ import annotations
 
@@ -41,7 +47,15 @@ class Shape:
     vocab: int
     train_context: int
     n_ff: int = 0
+    # Per-head K and V widths. Default to head_dim, which is right for
+    # every architecture that does not say otherwise.
+    key_dim: int = 0
+    value_dim: int = 0
     tensors: list = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.key_dim = self.key_dim or self.head_dim
+        self.value_dim = self.value_dim or self.head_dim
 
     @property
     def params(self) -> int:
@@ -59,6 +73,15 @@ class Shape:
     def gqa_ratio(self) -> float:
         return self.n_head / self.n_head_kv
 
+    @property
+    def kv_dim_total(self) -> int:
+        """K plus V width per kv head. The 2 in the old formula."""
+        return self.key_dim + self.value_dim
+
+    @property
+    def asymmetric_kv(self) -> bool:
+        return self.key_dim != self.value_dim
+
     def params_from_config(self) -> int:
         """Parameter count from the dimensions, with no tensor table.
 
@@ -71,10 +94,11 @@ class Shape:
             return self.params
         n_ff = self.n_ff or int(self.n_embd * 3.5)
         per_layer = (
-            self.n_embd * self.n_head * self.head_dim          # q
-            + 2 * self.n_embd * self.n_head_kv * self.head_dim  # k, v
-            + self.n_head * self.head_dim * self.n_embd        # o
-            + 3 * self.n_embd * n_ff                           # gate/up/down
+            self.n_embd * self.n_head * self.head_dim
+            + self.n_embd * self.n_head_kv * self.key_dim
+            + self.n_embd * self.n_head_kv * self.value_dim
+            + self.n_head * self.head_dim * self.n_embd
+            + 3 * self.n_embd * n_ff
         )
         return (2 * self.n_embd * self.vocab
                 + self.n_layers * per_layer)
@@ -117,6 +141,9 @@ def from_gguf(meta: dict, tensors: list, path: str = "") -> Shape:
         vocab=vocab,
         train_context=m("context_length", 0),
         n_ff=m("feed_forward_length", 0) or 0,
+        # Explicit when the architecture sets them, head_dim otherwise.
+        key_dim=m("attention.key_length", 0) or 0,
+        value_dim=m("attention.value_length", 0) or 0,
         tensors=[Tensor(t["name"], t["dims"],
                         ggml_types.name(t["type"])) for t in tensors],
     )

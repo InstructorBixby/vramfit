@@ -46,7 +46,7 @@ class Budget:
         return (self.weights + self.kv_cache + self.compute
                 + self.cuda_context + self.headroom)
 
-    def rows(self):
+    def rows(self) -> list:
         return [
             ("weights", self.weights),
             ("kv cache", self.kv_cache),
@@ -69,29 +69,28 @@ class Budget:
 
 def kv_bytes(shape, context: int, dtype_bytes: float = 2,
              layers: int | None = None) -> int:
-    """K and V for `context` positions, across `layers` layers.
+    """The K and V cache for `context` positions, over `layers` layers.
 
-    The head count here is `n_head_kv` and not `n_head`. Under GQA the
-    K and V projections are shared across a group of query heads, so the
-    cache holds `n_head_kv x head_dim` per position per tensor. Under
-    MQA `n_head_kv` is 1.
+    Per position per layer the cache holds `n_head_kv x (key_dim +
+    value_dim)` elements. Two things in that are easy to get wrong:
 
-    `dtype_bytes` is a float because a quantised cache is not a whole
-    number of bytes per element: q8_0 is 34 bytes per 32, which is 8.5
-    bits and not 8.
+    - the head count is `n_head_kv`, not `n_head`. Under GQA several
+      query heads share one K/V projection; under MQA `n_head_kv` is 1.
+      Using `n_head` over-predicts by the GQA ratio.
+    - `key_dim` and `value_dim` are usually both `head_dim`, and some
+      architectures set them explicitly and differently.
 
-    `layers` defaults to all of them. It is a parameter because the
-    cache for a layer lives wherever that layer lives, so a partially
-    offloaded model has a partially offloaded cache.
+    `layers` defaults to all of them, because the cache for a layer
+    lives wherever that layer lives.
     """
     n = shape.n_layers if layers is None else layers
-    return int(2 * n * shape.n_head_kv * shape.head_dim
+    return int(n * shape.n_head_kv * shape.kv_dim_total
                * context * dtype_bytes)
 
 
 def kv_bytes_per_token(shape, dtype_bytes: float = 2) -> int:
     """The slope of the cache against context."""
-    return int(2 * shape.n_layers * shape.n_head_kv * shape.head_dim
+    return int(shape.n_layers * shape.n_head_kv * shape.kv_dim_total
                * dtype_bytes)
 
 
@@ -151,7 +150,7 @@ def build(shape, context: int, *, cache_dtype: str = "f16",
     """
     from vramfit import cache as cache_mod
 
-    notes = []
+    notes: list = []
     if cuda_context is None:
         cuda_context = ASSUMED_CUDA_CONTEXT
         notes.append("cuda context is assumed, not measured: run "
@@ -182,6 +181,11 @@ def build(shape, context: int, *, cache_dtype: str = "f16",
 
     kv = kv_bytes(shape, context, cache_dtype_bytes, resident_layers)
     compute = compute_bytes(shape, context, batch)
+    if getattr(shape, "asymmetric_kv", False):
+        notes.append(
+            f"this architecture declares key_length "
+            f"{shape.key_dim} and value_length {shape.value_dim} "
+            f"separately; the cache is sized from both")
     if not full:
         notes.append(
             f"partial offload: {resident_layers}/{shape.n_layers} "
