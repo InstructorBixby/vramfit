@@ -56,6 +56,17 @@ class MoE:
         return (self.resident_bytes / self.bytes_per_token
                 if self.bytes_per_token else 1.0)
 
+    def summary(self) -> str:
+        gib = 1024 ** 3
+        return (f"moe: {self.n_used} of {self.n_experts} experts per "
+                f"token\n"
+                f"  resident  {self.resident_bytes / gib:7.3f} GiB  "
+                f"(all experts; any token may route anywhere)\n"
+                f"  per token {self.bytes_per_token / gib:7.3f} GiB  "
+                f"(dense + routed experts)\n"
+                f"  decode reads {self.speed_ratio:.1f}x fewer bytes "
+                f"than the model's size")
+
 
 def is_expert_tensor(name: str) -> bool:
     return any(name.endswith(s) for s in EXPERT_SUFFIXES)
@@ -65,7 +76,7 @@ def is_shared_expert_tensor(name: str) -> bool:
     return any(name.endswith(s) for s in SHARED_SUFFIXES)
 
 
-def from_shape(shape, n_experts: int = 0, n_used: int = 0) -> MoE | None
+def from_shape(shape, n_experts: int = 0, n_used: int = 0) -> MoE | None:
     """None for a dense model, which is most of them."""
     if not n_experts or n_experts < 2:
         return None
