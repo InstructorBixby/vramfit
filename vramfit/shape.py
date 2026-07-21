@@ -51,6 +51,9 @@ class Shape:
     # every architecture that does not say otherwise.
     key_dim: int = 0
     value_dim: int = 0
+    # 0 for a dense model.
+    n_experts: int = 0
+    n_experts_used: int = 0
     tensors: list = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -82,6 +85,14 @@ class Shape:
     def asymmetric_kv(self) -> bool:
         return self.key_dim != self.value_dim
 
+    @property
+    def moe(self):
+        """MoE accounting, or None for a dense model."""
+        from vramfit import moe as moe_mod
+
+        return moe_mod.from_shape(self, self.n_experts,
+                                  self.n_experts_used)
+
     def params_from_config(self) -> int:
         """Parameter count from the dimensions, with no tensor table.
 
@@ -98,7 +109,7 @@ class Shape:
             + self.n_embd * self.n_head_kv * self.key_dim
             + self.n_embd * self.n_head_kv * self.value_dim
             + self.n_head * self.head_dim * self.n_embd
-            + 3 * self.n_embd * n_ff
+            + 3 * self.n_embd * n_ff * max(1, self.n_experts)
         )
         return (2 * self.n_embd * self.vocab
                 + self.n_layers * per_layer)
@@ -144,6 +155,8 @@ def from_gguf(meta: dict, tensors: list, path: str = "") -> Shape:
         # Explicit when the architecture sets them, head_dim otherwise.
         key_dim=m("attention.key_length", 0) or 0,
         value_dim=m("attention.value_length", 0) or 0,
+        n_experts=m("expert_count", 0) or 0,
+        n_experts_used=m("expert_used_count", 0) or 0,
         tensors=[Tensor(t["name"], t["dims"],
                         ggml_types.name(t["type"])) for t in tensors],
     )
