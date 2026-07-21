@@ -18,6 +18,7 @@ class Ceiling:
     basis: str          # "bandwidth" or "flops"
     bytes_per_token: int = 0
     flops_per_token: int = 0
+    notes: tuple = ()
 
 
 def decode_bytes_per_token(shape: Shape, context: int,
@@ -25,13 +26,20 @@ def decode_bytes_per_token(shape: Shape, context: int,
                            weights: int | None = None) -> int:
     """Bytes that must cross the memory bus to emit one token.
 
-    Every weight, read once, plus the whole cache up to the current
-    position. Averaging the cache over the generation would be more
-    accurate for a long run and less useful for a ceiling, so this is
-    the cost at `context` and the caller decides what context means.
+    Every weight that the token routes through, read once, plus the
+    whole cache up to the current position.
+
+    On a mixture-of-experts model "every weight" is not the model: a
+    token reads the dense layers plus the experts it routes to, so this
+    is far smaller than residency. Using residency here under-predicts
+    MoE decode speed by the expert ratio, which on a 128-expert model
+    is most of an order of magnitude.
     """
-    w = shape.weight_bytes if weights is None else weights
-    return w + budget.kv_bytes(shape, context, cache_dtype_bytes)
+    if weights is None:
+        mix = shape.moe
+        weights = (mix.bytes_per_token if mix is not None
+                   else shape.weight_bytes)
+    return weights + budget.kv_bytes(shape, context, cache_dtype_bytes)
 
 
 def decode_ceiling(shape: Shape, context: int, bandwidth_bps: float,
@@ -39,12 +47,29 @@ def decode_ceiling(shape: Shape, context: int, bandwidth_bps: float,
                    weights: int | None = None) -> Ceiling:
     per = decode_bytes_per_token(shape, context, cache_dtype_bytes,
                                  weights)
+    notes: tuple = ()
+    mix = shape.moe
+    if mix is not None and weights is None:
+        notes = (f"moe: {mix.n_used} of {mix.n_experts} experts read "
+                 f"per token, so decode moves "
+                 f"{mix.speed_ratio:.1f}x fewer bytes than the model's "
+                 f"size -- residency is unaffected",)
     return Ceiling(tok_s=bandwidth_bps / per, basis="bandwidth",
-                   bytes_per_token=per)
+                   bytes_per_token=per, notes=notes)
 
 
 def prefill_flops_per_token(shape: Shape) -> int:
-    """Two FLOPs per parameter, attention term ignored. See docs."""
+    """Two FLOPs per active parameter, attention term ignored.
+
+    Active, not total: on an MoE model a token only does the arithmetic
+    of the experts it routes to. The byte and the FLOP accounting agree
+    about that, which they do not about residency.
+    """
+    mix = shape.moe
+    if mix is not None and shape.weight_bytes:
+        active = shape.params * (mix.bytes_per_token
+                                 / shape.weight_bytes)
+        return int(2 * active)
     return 2 * shape.params
 
 
