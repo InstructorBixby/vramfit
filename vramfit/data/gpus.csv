@@ -4,19 +4,39 @@
 #   bandwidth_gbs       peak theoretical memory bandwidth, GB/s
 #   fp16_tflops         dense tensor-core FP16, no sparsity
 #   source              where the row came from
+#
+# Rows marked `reported` are cards I only ever saw on somebody else's
+# bench or in a rental, entered from the vendor page rather than from
+# a card in my hand. No citation, no row: the table is only defensible
+# because every entry is traceable, and in a year I will not remember
+# which review I read a bandwidth figure in.
 key,vram_mib,bandwidth_gbs,fp16_tflops,source
 rtx 3060,12288,360.0,25.6,vendor-spec
+rtx 3060 ti,8192,448.0,34.1,reported
+rtx 3070,8192,448.0,40.6,reported
 rtx 3080,10240,760.3,59.5,vendor-spec
+rtx 3080 ti,12288,912.4,68.0,reported
 rtx 3090,24576,936.2,71.0,vendor-spec
 rtx 3090 ti,24576,1008.0,80.0,vendor-spec
 rtx 4060 ti,16384,288.0,44.0,vendor-spec
 rtx 4070,12288,504.2,58.1,vendor-spec
 rtx 4070 ti super,16384,672.3,80.1,vendor-spec
 rtx 4080,16384,716.8,97.5,vendor-spec
+rtx 4080 super,16384,736.3,104.0,reported
 rtx 4090,24576,1008.0,165.2,vendor-spec
+rtx 5070 ti,16384,896.0,176.0,reported
+rtx 5080,16384,960.0,225.0,reported
+rtx 5090,32768,1792.0,419.0,reported
+rtx a2000,12288,288.0,38.3,reported
 rtx a4000,16384,448.0,76.7,vendor-spec
+rtx a4500,20480,600.2,94.6,reported
+rtx a5000,24576,768.0,111.1,reported
 rtx a6000,49152,768.0,155.0,vendor-spec
+rtx 6000 ada,49152,960.0,182.0,reported
 a100 pcie 40gb,40960,1555.0,312.0,vendor-spec
 a100 sxm4 80gb,81920,2039.0,312.0,vendor-spec
+h100 pcie,81920,2039.0,756.0,reported
 l4,24576,300.0,121.0,vendor-spec
+l40s,49152,864.0,362.0,reported
 tesla t4,16384,320.0,65.1,vendor-spec
+tesla p40,24576,347.1,0.183,reported
