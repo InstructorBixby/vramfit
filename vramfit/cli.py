@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import argparse
 
-from vramfit import (__version__, budget, cmd_bench, cmd_intake,
-                     cmd_fit, cmd_ledger, cmd_plan, devices, explain,
-                     load, measure, quants, solve, specs)
+from vramfit import (__version__, budget, cmd_accuracy, cmd_bench,
+                     cmd_intake, cmd_fit, cmd_ledger, cmd_plan,
+                     devices, explain, load, measure, quants, solve,
+                     specs)
 
 GIB = 1024 ** 3
 MIB = 1024 ** 2
@@ -23,6 +24,7 @@ cuda_context_for = cmd_fit.cuda_context_for
 
 def cmd_shape(args: argparse.Namespace) -> int:
     sh, how = load.load(args.model)
+    mix = sh.moe
     if getattr(args, "json", False):
         from vramfit import jsonout
         print(jsonout.dump({
@@ -31,8 +33,13 @@ def cmd_shape(args: argparse.Namespace) -> int:
             "bits_per_weight": round(sh.bpw, 4) if sh.params else None,
             "layers": sh.n_layers, "attention_heads": sh.n_head,
             "kv_heads": sh.n_head_kv, "head_dim": sh.head_dim,
+            "key_dim": sh.key_dim, "value_dim": sh.value_dim,
             "vocab": sh.vocab, "trained_context": sh.train_context,
             "kv_bytes_per_token": budget.kv_bytes_per_token(sh),
+            "experts": sh.n_experts or None,
+            "experts_used": sh.n_experts_used or None,
+            "bytes_per_token": (mix.bytes_per_token if mix
+                                else sh.weight_bytes),
             "quant_mix": sh.quant_mix() if sh.params else {},
         }))
         return 0
@@ -45,11 +52,18 @@ def cmd_shape(args: argparse.Namespace) -> int:
     print(f"layers        {sh.n_layers}")
     print(f"heads         {sh.n_head} attention / {sh.n_head_kv} kv "
           f"(gqa {sh.gqa_ratio:.0f}x)")
-    print(f"head_dim      {sh.head_dim}")
+    if sh.asymmetric_kv:
+        print(f"head_dim      {sh.head_dim}  "
+              f"(key {sh.key_dim} / value {sh.value_dim})")
+    else:
+        print(f"head_dim      {sh.head_dim}")
     print(f"vocab         {sh.vocab}")
     print(f"train context {sh.train_context}")
     print(f"kv per token  "
           f"{budget.kv_bytes_per_token(sh) / 1024:.0f} KiB (f16)")
+    if mix is not None:
+        print()
+        print(mix.summary())
     if sh.params:
         print()
         for name, nbytes in sh.quant_mix().items():
@@ -104,7 +118,7 @@ def cmd_devices(args: argparse.Namespace) -> int:
         if spec is None:
             print("    no spec row: bandwidth ratios unavailable")
             print("    add a row to vramfit/data/gpus.csv with a "
-                  "citation")
+                  "citation; see docs/cards.md")
         else:
             print(f"    peak {spec.bandwidth_gbs:.1f} GB/s, "
                   f"{spec.fp16_tflops:.1f} TFLOP/s fp16 "
@@ -114,6 +128,11 @@ def cmd_devices(args: argparse.Namespace) -> int:
         ctx = measure.cached_cuda_context(d.index, d.name, d.driver)
         if ctx:
             print(f"    cuda context {ctx / MIB:.0f} MiB (measured)")
+        else:
+            stale = measure.stale_entries(d.name, d.driver)
+            if stale:
+                print(f"    cuda context not measured on this driver; "
+                      f"have {len(stale)} entr(y|ies) from another")
     return 0
 
 
@@ -154,6 +173,7 @@ def build_parser() -> argparse.ArgumentParser:
     cmd_bench.add_parser(sub)
     cmd_ledger.add_parser(sub)
     cmd_intake.add_parser(sub)
+    cmd_accuracy.add_parser(sub)
 
     p = sub.add_parser("quants", help="the bpw ladder")
     p.set_defaults(fn=cmd_quants)
