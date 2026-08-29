@@ -3,4 +3,4 @@
 The public API is `vramfit.api`. Everything else is internal; see
 docs/stability.md for what that means in practice.
 """
-__version__ = "1.1.0"
+__version__ = "1.2.0"

@@ -2,6 +2,31 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [1.2.0]
+
+### Added
+- Mixture-of-experts support. Residency needs every expert
+  because any token may route anywhere; decode reads only the
+  routed ones. Predicting speed from the total size under-predicts
+  by most of an order of magnitude, and predicting VRAM from the
+  active size is how you get an OOM. `docs/moe.md`.
+- `vramfit accuracy`: prediction error across the ledger, signed,
+  because a systematically low prediction is a missing term and a
+  systematically high one is wasted capacity.
+- `docs/cards.md` and twelve more cards, including the current
+  generation, reported with citations.
+- `docs/findings.md`: the things keeping every measurement has
+  caught that would otherwise have been a vague feeling.
+- `measure.stale_entries`, and `devices` says when the cached CUDA
+  context figure is from a different driver.
+
+### Fixed
+- `attention.key_length` / `attention.value_length` are read when
+  the architecture sets them. A contributed report of a 40% cache
+  over-prediction was an architecture where the key width is not
+  `rope.dimension_count`.
+- The prefill ceiling uses active parameters on an MoE model.
+
 ## [1.1.0]
 
 ### Added
