@@ -2,6 +2,21 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [1.3.0]
+
+### Added
+- Speculative decoding: the draft model budgeted as a second
+  model, and an explicit refusal to report a bandwidth fraction
+  while speculation is on. The ceiling assumes one forward pass
+  per token, which is the assumption a draft model removes, so
+  measured tok/s can exceed it legitimately.
+- Multi-GPU layer-wise splits. Three things two cards are not:
+  one card with more memory, an even split (the primary card
+  carries the embedding and output tensors), or the sum of their
+  bandwidths (a layer-wise split is sequential, so decode is bound
+  by the *slowest* card -- adding a slow card buys context and
+  costs speed, and that trade is the actual decision).
+
 ## [1.2.0]
 
 ### Added
