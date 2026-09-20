@@ -26,15 +26,19 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - FAQ: faq.md
   - How it works:
       - The VRAM budget: budget.md
       - The two speeds: speed.md
       - Partial offload: offload.md
+      - Mixture of experts: moe.md
       - Backends: backends.md
+      - The card table: cards.md
   - Measurements:
       - Keeping the numbers: ledger.md
       - Contributed results: measured.md
       - Contributing a measurement: contributing-measurements.md
+      - What the ledger caught: findings.md
   - Running out later: oom.md
   - Where this is wrong: wrong.md
   - Project:
