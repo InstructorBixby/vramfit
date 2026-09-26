@@ -2,6 +2,21 @@
 
 Format follows Keep a Changelog, versions follow semver.
 
+## [1.3.1]
+
+### Fixed
+- The ternary quant types are in the type table. A contributed
+  file used one and the loader refused it, which was the right
+  failure for the wrong reason -- an unknown type id stays fatal
+  on purpose, because a default would turn an unrecognised tensor
+  type into a confident and wrong size.
+- The unknown-type error now says to open an issue and what to put
+  in it.
+
+### Added
+- `docs/faq.md`, for the five questions that keep arriving.
+- A test asserting every id in the type table has block geometry.
+
 ## [1.3.0]
 
 ### Added
