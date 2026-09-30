@@ -79,3 +79,9 @@ source = ["vramfit"]
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:",
                  "raise NotImplementedError"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests are allowed to be untyped and to use magic numbers: the
+# numbers are the point.
+"tests/*" = ["ANN"]
+"tools/*" = ["ANN", "E402"]
