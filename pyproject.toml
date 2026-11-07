@@ -39,9 +39,9 @@ Issues = "https://github.com/c01n31pan1c/vramfit/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.9"]
-nvml = ["nvidia-ml-py>=12"]
+nvml = ["nvidia-ml-py>=13.615.71"]
 docs = ["mkdocs>=1.5", "mkdocs-material>=9.5"]
-all = ["nvidia-ml-py>=12"]
+all = ["nvidia-ml-py>=13.615.71"]
 
 [project.scripts]
 vramfit = "vramfit.cli:main"
