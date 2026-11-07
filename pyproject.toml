@@ -38,9 +38,9 @@ Changelog = "https://github.com/c01n31pan1c/vramfit/blob/main/CHANGELOG.md"
 Issues = "https://github.com/c01n31pan1c/vramfit/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.9"]
+dev = ["pytest>=9.2.0", "pytest-cov>=7.1.0", "ruff>=0.17.3", "mypy>=2.4.1"]
 nvml = ["nvidia-ml-py>=12"]
-docs = ["mkdocs>=1.5", "mkdocs-material>=9.5"]
+docs = ["mkdocs>=1.6.1", "mkdocs-material>=9.7.7"]
 all = ["nvidia-ml-py>=12"]
 
 [project.scripts]
